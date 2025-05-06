@@ -1,6 +1,6 @@
 # IMPACT 2025 For secretary
 
-A locally hosted application designed to help church secretaries manage Bible study participants, track attendance for various sessions, and record referral information. Built with a focus on offline usability and a clear, manageable interface.
+A locally hosted application designed to help church secretaries manage evangelistic campain participants, track attendance for various sessions, and record referral information. Built with a focus on offline usability and a clear, manageable interface.
 
 ## Features
 
