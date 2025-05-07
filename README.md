@@ -120,4 +120,3 @@ The project is organized into two main directories:
 
 ---
 
-This README provides a general overview. For more detailed setup instructions, refer to any specific setup guides provided with the project.
