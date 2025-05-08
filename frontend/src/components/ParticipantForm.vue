@@ -26,6 +26,10 @@ const formData = reactive({
   id: null,
   name: '',
   contact_info: '',
+  age: '',
+  gender: '',
+  main_address: '',
+  locality: '',
   date_joined: '',
   referred_by_participant_id: '',
 });
@@ -56,6 +60,10 @@ const resetForm = (participant) => {
   formData.id = participant?.id || null;
   formData.name = participant?.name || '';
   formData.contact_info = participant?.contact_info || '';
+  formData.age = participant?.age || '';
+  formData.gender = participant?.gender || '';
+  formData.main_address = participant?.main_address || '';
+  formData.locality = participant?.locality || '';
   formData.date_joined = formatDateForInput(participant?.date_joined) || todayDateString();
   formData.referred_by_participant_id = participant?.referred_by_participant_id || '';
   formError.value = ''; // Clear any previous errors
@@ -75,39 +83,42 @@ const availableReferrers = computed(() => {
 });
 
 // --- Methods ---
-// Method called when the form is submitted (e.g., by clicking the Save button in the modal footer)
+// Method called when the form is submitted
 const submit = async () => {
   formError.value = ''; // Clear previous errors
 
   // Basic validation
   if (!formData.name.trim()) {
     formError.value = 'Participant name cannot be empty.';
-    return; // Stop submission if validation fails
+    return;
   }
   if (!formData.date_joined) {
-      formError.value = 'Date joined cannot be empty.';
-      return;
+    formError.value = 'Date joined cannot be empty.';
+    return;
   }
 
   // Prepare the data payload to be sent
   const dataToSave = {
     name: formData.name.trim(),
     contact_info: formData.contact_info.trim(),
+    age: formData.age ? parseInt(formData.age) : null,
+    gender: formData.gender || null,
+    main_address: formData.main_address.trim(),
+    locality: formData.locality.trim(),
     date_joined: formData.date_joined,
-    // Ensure referred_by ID is an integer or null
     referred_by_participant_id: formData.referred_by_participant_id
                                   ? parseInt(formData.referred_by_participant_id, 10)
                                   : null,
   };
 
-  // Emit the 'save' event with the data. The parent component (App.vue)
-  // will handle the actual API call and pass back any errors.
-  // We capture the potential error message returned by the parent.
+  // Emit the 'save' event with the data
   const apiError = await emit('save', dataToSave);
   if (apiError) {
-    formError.value = apiError; // Display API error returned from parent
+    formError.value = apiError;
+  } else {
+    // Reset form after successful save
+    resetForm(null);
   }
-  // Note: Form reset/modal close is handled by the parent upon successful save
 };
 
 // Expose the submit method so the parent component (modal footer) can trigger it
@@ -125,7 +136,7 @@ defineExpose({
     </div>
 
     <div class="mb-3">
-      <label for="part-form-name" class="form-label">Name <span class="text-danger">*</span></label>
+      <label for="part-form-name" class="form-label">Nom <span class="text-danger">*</span></label>
       <input
         id="part-form-name"
         v-model="formData.name"
@@ -137,7 +148,7 @@ defineExpose({
     </div>
 
     <div class="mb-3">
-      <label for="part-form-contact" class="form-label">Contact Info (Phone/Email)</label>
+      <label for="part-form-contact" class="form-label">Contact (Téléphone/Email)</label>
       <input
         id="part-form-contact"
         v-model="formData.contact_info"
@@ -148,7 +159,56 @@ defineExpose({
     </div>
 
     <div class="mb-3">
-      <label for="part-form-joined" class="form-label">Date Joined <span class="text-danger">*</span></label>
+      <label for="age" class="form-label">Âge</label>
+      <input
+        id="age"
+        v-model="formData.age"
+        type="number"
+        min="0"
+        max="120"
+        class="form-control form-control-sm"
+        :disabled="saving"
+      >
+    </div>
+
+    <div class="mb-3">
+      <label for="gender" class="form-label">Genre</label>
+      <select
+        id="gender"
+        v-model="formData.gender"
+        class="form-select form-select-sm"
+        :disabled="saving"
+      >
+        <option value="">Sélectionner...</option>
+        <option value="M">Masculin</option>
+        <option value="F">Féminin</option>
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label for="main_address" class="form-label">Adresse</label>
+      <input
+        id="main_address"
+        v-model="formData.main_address"
+        type="text"
+        class="form-control form-control-sm"
+        :disabled="saving"
+      >
+    </div>
+
+    <div class="mb-3">
+      <label for="part-form-locality" class="form-label">Quartier</label>
+      <input
+        id="part-form-locality"
+        v-model="formData.locality"
+        type="text"
+        class="form-control form-control-sm"
+        :disabled="saving"
+      >
+    </div>
+
+    <div class="mb-3">
+      <label for="part-form-joined" class="form-label">Date d'inscription <span class="text-danger">*</span></label>
       <input
         id="part-form-joined"
         type="date"
@@ -160,14 +220,14 @@ defineExpose({
     </div>
 
     <div class="mb-3">
-      <label for="part-form-referrer" class="form-label">Referred By</label>
+      <label for="part-form-referrer" class="form-label">Recommandé par</label>
       <select
         id="part-form-referrer"
         v-model="formData.referred_by_participant_id"
         class="form-select form-select-sm"
         :disabled="saving"
       >
-        <option value="">-- None --</option>
+        <option value="">-- Aucun --</option>
         <option v-for="p in availableReferrers" :key="p.id" :value="p.id">
           {{ p.name }}
         </option>

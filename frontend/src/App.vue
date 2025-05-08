@@ -9,15 +9,17 @@ import ParticipantList from './components/ParticipantList.vue';
 import SessionForm from './components/SessionForm.vue';
 import SessionList from './components/SessionList.vue';
 import AttendanceTracker from './components/AttendanceTracker.vue';
+import Dashboard from './components/Dashboard.vue';
+import Admin from './components/Admin.vue';
 
 // Import Icons
-import { BookOpen, Users, Calendar, AlertCircle, XCircle, Save, PlusCircle, UserCheck } from 'lucide-vue-next';
+import { BookOpen, Users, Calendar, AlertCircle, XCircle, Save, PlusCircle, UserCheck, BarChart2 } from 'lucide-vue-next';
 
 // --- Configuration ---
 const API_BASE_URL = 'http://localhost:3001/api'; // Backend API URL
 
 // --- State ---
-const view = ref('participants'); // Current view: 'participants', 'sessions', 'attendance'
+const view = ref('dashboard'); // Current view: 'dashboard', 'participants', 'sessions', 'attendance', 'admin'
 const participants = ref([]);    // Array of all participants
 const sessions = ref([]);        // Array of all sessions
 const selectedSession = ref(null); // The session object currently being viewed/edited for attendance
@@ -34,6 +36,13 @@ const loading = reactive({
 const saving = ref(false);
 // Global Error Message
 const error = ref(null);
+
+// Success notification state
+const successNotification = ref({
+  show: false,
+  message: '',
+  participantId: null
+});
 
 // --- Modal State & Refs ---
 // Participant Modal
@@ -150,10 +159,21 @@ const handleEditParticipant = (participant) => {
 const handleSaveParticipant = async (participantData) => {
     let apiError = null;
     try {
+        let response;
         if (editingParticipant.value?.id) {
-            await apiCall(`/participants/${editingParticipant.value.id}`, 'PUT', participantData);
+            response = await apiCall(`/participants/${editingParticipant.value.id}`, 'PUT', participantData);
+            successNotification.value = {
+                show: true,
+                message: 'Participant modifié avec succès',
+                participantId: editingParticipant.value.id
+            };
         } else {
-            await apiCall('/participants', 'POST', participantData);
+            response = await apiCall('/participants', 'POST', participantData);
+            successNotification.value = {
+                show: true,
+                message: `Participant créé avec succès (ID: ${response.id})`,
+                participantId: response.id
+            };
         }
         showParticipantModal.value = false;
         await fetchParticipants();
@@ -250,10 +270,20 @@ const formattedSelectedSessionDate = computed(() => {
     return '';
 });
 
+// Gestionnaire de navigation
+const handleNavigation = (newView) => {
+    view.value = newView;
+    if (newView === 'sessions') {
+        selectedSession.value = null;
+        currentAttendance.value = [];
+    }
+};
+
 </script>
 
 <template>
     <div class="app-wrapper bg-light min-vh-100 d-flex flex-column">
+        <!-- HEADER TOUJOURS VISIBLE -->
         <header class="py-3 py-md-4 text-center shadow-sm bg-white">
             <h1 class="h2 mb-1 d-flex align-items-center justify-content-center gap-2 text-primary">
                 <BookOpen :size="30" /> IMPACT 2025
@@ -275,87 +305,110 @@ const formattedSelectedSessionDate = computed(() => {
         </div>
 
         <div v-else class="container py-3 py-md-4 flex-grow-1">
-            <nav class="nav nav-pills justify-content-center mb-4">
-                <button class="nav-link d-flex align-items-center px-3 py-2"
-                        :class="{ 'active': view === 'participants' }"
-                        @click="view = 'participants'">
-                    <Users class="me-2" :size="18" /> Participants
-                </button>
-                <button class="nav-link d-flex align-items-center px-3 py-2"
-                        :class="{ 'active': view === 'sessions' || view === 'attendance' }"
-                        @click="view = 'sessions'; selectedSession = null; currentAttendance = [];">
-                    <Calendar class="me-2" :size="18" /> Sessions & Attendance
-                </button>
-            </nav>
-
-            <main>
-                <div v-if="view === 'participants'" class="card shadow-sm">
-                    <div class="card-header bg-white py-3">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <h2 class="h5 mb-0 text-primary d-flex align-items-center">
-                                <Users class="me-2" :size="22" /> All Participants
-                            </h2>
-                            <button @click="handleAddParticipant" class="btn btn-primary btn-sm">
-                                <PlusCircle class="me-1" :size="16" /> Add New
-                            </button>
+            <div class="row">
+                <!-- Navigation latérale -->
+                <div class="col-md-3">
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <h5 class="card-title mb-3">Menus</h5>
+                            <div class="list-group">
+                                <a href="#" class="list-group-item list-group-item-action" 
+                                   :class="{ 'active': view === 'dashboard' }"
+                                   @click.prevent="handleNavigation('dashboard')">
+                                    <BarChart2 class="me-2" :size="18" /> Dashboard
+                                </a>
+                                <a href="#" class="list-group-item list-group-item-action"
+                                   :class="{ 'active': view === 'participants' }"
+                                   @click.prevent="handleNavigation('participants')">
+                                    <Users class="me-2" :size="18" /> Liste des participants
+                                </a>
+                                <a href="#" class="list-group-item list-group-item-action"
+                                   :class="{ 'active': view === 'sessions' || view === 'attendance' }"
+                                   @click.prevent="handleNavigation('sessions')">
+                                    <Calendar class="me-2" :size="18" /> Sessions & Présence
+                                </a>
+                            </div>
                         </div>
-                    </div>
-                    <div class="card-body">
-                        <ParticipantList
-                            :participants="participants"
-                            :loading="loading.participants"
-                            @edit-participant="handleEditParticipant"
-                            @delete-participant="handleDeleteParticipant"
-                        />
                     </div>
                 </div>
 
-                <div v-if="view === 'sessions'" class="card shadow-sm">
-                     <div class="card-header bg-white py-3">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <h2 class="h5 mb-0 text-primary d-flex align-items-center">
-                                <Calendar class="me-2" :size="22" /> Study Sessions
-                            </h2>
-                            <button @click="handleAddSession" class="btn btn-primary btn-sm">
-                                <PlusCircle class="me-1" :size="16" /> Add New
-                            </button>
+                <!-- Contenu principal -->
+                <div class="col-md-9">
+                    <main>
+                        <div v-if="view === 'dashboard'">
+                            <Dashboard @navigate="handleNavigation" />
                         </div>
-                    </div>
-                    <div class="card-body">
-                        <SessionList
-                            :sessions="sessions"
-                            :loading="loading.sessions"
-                            @view-attendance="handleViewAttendance"
-                            @delete-session="handleDeleteSession"
-                        />
-                    </div>
-                </div>
+                        <div v-if="view === 'participants'" class="card shadow-sm">
+                            <div class="card-header bg-white py-3">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h2 class="h5 mb-0 text-primary d-flex align-items-center">
+                                        <Users class="me-2" :size="22" /> Liste des participants
+                                    </h2>
+                                    <button @click="handleAddParticipant" class="btn btn-primary btn-sm">
+                                        <PlusCircle class="me-1" :size="16" /> Ajouter
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <ParticipantList
+                                    :participants="participants"
+                                    :loading="loading.participants"
+                                    @edit-participant="handleEditParticipant"
+                                    @delete-participant="handleDeleteParticipant"
+                                />
+                            </div>
+                        </div>
 
-                <div v-if="view === 'attendance' && selectedSession" class="card shadow-sm">
-                    <div class="card-header bg-white py-3">
-                        <div class="d-flex justify-content-between align-items-center">
-                             <h2 class="h5 mb-0 text-primary d-flex align-items-center">
-                                <UserCheck class="me-2" :size="22" />
-                                Attendance: {{ selectedSession.topic || formattedSelectedSessionDate }}
-                            </h2>
-                            <button class="btn btn-outline-secondary btn-sm" @click="handleBackToSessions">
-                                &laquo; Back to Sessions
-                            </button>
+                        <div v-if="view === 'sessions'" class="card shadow-sm">
+                            <div class="card-header bg-white py-3">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h2 class="h5 mb-0 text-primary d-flex align-items-center">
+                                        <Calendar class="me-2" :size="22" /> Sessions & Présence
+                                    </h2>
+                                    <button @click="handleAddSession" class="btn btn-primary btn-sm">
+                                        <PlusCircle class="me-1" :size="16" /> Ajouter
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <SessionList
+                                    :sessions="sessions"
+                                    :loading="loading.sessions"
+                                    @view-attendance="handleViewAttendance"
+                                    @delete-session="handleDeleteSession"
+                                />
+                            </div>
                         </div>
-                    </div>
-                    <div class="card-body">
-                         <AttendanceTracker
-                            :session="selectedSession"
-                            :participants="participants"
-                            :initial-attendance="currentAttendance"
-                            :loading="loading.attendance"
-                            :saving="saving"
-                            @save-attendance="handleSaveAttendance"
-                            @delete-session="handleDeleteSession"
-                         />
-                    </div>
-                 </div>
-            </main>
+
+                        <div v-if="view === 'attendance' && selectedSession" class="card shadow-sm">
+                            <div class="card-header bg-white py-3">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h2 class="h5 mb-0 text-primary d-flex align-items-center">
+                                        <UserCheck class="me-2" :size="22" />
+                                        Présence: {{ selectedSession.topic || formattedSelectedSessionDate }}
+                                    </h2>
+                                    <button class="btn btn-outline-secondary btn-sm" @click="handleBackToSessions">
+                                        &laquo; Retour aux sessions
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <AttendanceTracker
+                                    :session="selectedSession"
+                                    :participants="participants"
+                                    :initial-attendance="currentAttendance"
+                                    :loading="loading.attendance"
+                                    :saving="saving"
+                                    @save-attendance="handleSaveAttendance"
+                                    @delete-session="handleDeleteSession"
+                                />
+                            </div>
+                        </div>
+
+                        <!-- (ne rien afficher pour view === 'admin') -->
+                    </main>
+                </div>
+            </div>
         </div>
 
         <BaseModal
@@ -412,6 +465,25 @@ const formattedSelectedSessionDate = computed(() => {
              </template>
          </BaseModal>
 
+        <!-- Success Notification Modal -->
+        <div v-if="successNotification.show" class="modal fade show" style="display: block; z-index: 9999;" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Succès</h5>
+                        <button type="button" class="btn-close" @click="successNotification.show = false"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>{{ successNotification.message }}</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary" @click="successNotification.show = false">OK</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-backdrop fade show" style="z-index: 9998;"></div>
+        </div>
+
         <footer class="mt-auto pt-3 pb-3 text-center text-muted small bg-white border-top">
             IMPACT2025 - Madagascar &copy; {{ new Date().getFullYear() }}
         </footer>
@@ -436,24 +508,10 @@ body, html {
     /* d-flex flex-column min-vh-100 are applied via class */
 }
 
-.nav-pills .nav-link {
-    border: 1px solid transparent;
-    margin: 0 4px;
-    color: #495057;
-    background-color: #e9ecef; /* Light background for non-active */
-    border-radius: 0.375rem; /* Bootstrap's default rounded corners */
-    transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out, border-color 0.15s ease-in-out;
-}
-.nav-pills .nav-link:hover {
-    background-color: #dee2e6; /* Slightly darker on hover */
-    color: #212529;
-}
-
+.nav-pills .nav-link,
+.nav-pills .nav-link:hover,
 .nav-pills .nav-link.active {
-     border-color: var(--bs-primary);
-     background-color: var(--bs-primary);
-     color: #fff;
-     box-shadow: 0 0.125rem 0.25rem rgba(var(--bs-primary-rgb), 0.15);
+    display: none;
 }
 
 .card-header {
@@ -480,4 +538,51 @@ body, html {
 /* @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap'); */
 /* Then apply `font-family: 'Inter', sans-serif;` to body or a main wrapper */
 
+/* Styles pour la modal de notification */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.modal-dialog {
+    position: relative;
+    z-index: 9999;
+}
+
+.modal-content {
+    position: relative;
+    z-index: 9999;
+}
+
+/* Styles pour la navigation latérale */
+.list-group-item {
+    border: none;
+    padding: 0.75rem 1rem;
+    color: #495057;
+}
+
+.list-group-item:hover {
+    background-color: #f8f9fa;
+}
+
+.list-group-item.active {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+.list-group-item.active:hover {
+    background-color: #0b5ed7;
+}
 </style>
