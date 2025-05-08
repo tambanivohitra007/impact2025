@@ -26,6 +26,10 @@ const db = new sqlite3.Database(DB_PATH, (err) => {
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL,
                     contact_info TEXT,
+                    age INTEGER,
+                    gender TEXT CHECK(gender IN ('M', 'F')),
+                    main_address TEXT,
+                    locality TEXT,
                     date_joined DATE DEFAULT CURRENT_DATE,
                     referred_by_participant_id INTEGER,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -35,6 +39,17 @@ const db = new sqlite3.Database(DB_PATH, (err) => {
             `, (err) => {
                 if (err) console.error("Error creating participants table:", err.message);
                 else console.log("Participants table checked/created.");
+            });
+
+            // Add gender column if it doesn't exist
+            db.run(`
+                ALTER TABLE participants ADD COLUMN gender TEXT CHECK(gender IN ('M', 'F'))
+            `, (err) => {
+                if (err && !err.message.includes('duplicate column name')) {
+                    console.error("Error adding gender column:", err.message);
+                } else {
+                    console.log("Gender column checked/added.");
+                }
             });
 
             db.run(`
@@ -116,7 +131,7 @@ app.get('/api/participants', (req, res) => {
         SELECT p.*, ref.name as referrer_name
         FROM participants p
         LEFT JOIN participants ref ON p.referred_by_participant_id = ref.id
-        ORDER BY p.name COLLATE NOCASE ASC
+        ORDER BY p.id ASC
     `;
     db.all(sql, [], (err, rows) => {
         if (handleDatabaseError(err, res, "Error fetching participants")) return;
@@ -146,24 +161,27 @@ app.get('/api/participants/:id', (req, res) => {
 
 // POST a new participant
 app.post('/api/participants', (req, res) => {
-    const { name, contact_info, date_joined, referred_by_participant_id } = req.body;
+    const { name, contact_info, age, gender, main_address, locality, date_joined, referred_by_participant_id } = req.body;
     if (!name) {
         return res.status(400).json({ error: "Participant name is required" });
     }
     // Ensure referred_by_participant_id is null if empty or invalid
     const referrerId = (referred_by_participant_id && !isNaN(parseInt(referred_by_participant_id))) ? parseInt(referred_by_participant_id) : null;
 
-    const sql = `INSERT INTO participants (name, contact_info, date_joined, referred_by_participant_id) VALUES (?, ?, ?, ?)`;
-    const params = [name, contact_info, date_joined || new Date().toISOString().split('T')[0], referrerId];
+    const sql = `INSERT INTO participants (name, contact_info, age, gender, main_address, locality, date_joined, referred_by_participant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+    const params = [name, contact_info, age, gender, main_address, locality, date_joined || new Date().toISOString().split('T')[0], referrerId];
 
-    db.run(sql, params, function(err) { // Use function() to access this.lastID
+    db.run(sql, params, function(err) {
         if (handleDatabaseError(err, res, "Error adding participant")) return;
-        // Return the newly created participant object
         res.status(201).json({
             id: this.lastID,
             name,
             contact_info,
-            date_joined: params[2], // Use the potentially defaulted date
+            age,
+            gender,
+            main_address,
+            locality,
+            date_joined: params[6],
             referred_by_participant_id: referrerId
         });
     });
@@ -172,7 +190,7 @@ app.post('/api/participants', (req, res) => {
 // PUT (update) an existing participant
 app.put('/api/participants/:id', (req, res) => {
     const { id } = req.params;
-    const { name, contact_info, date_joined, referred_by_participant_id } = req.body;
+    const { name, contact_info, age, gender, main_address, locality, date_joined, referred_by_participant_id } = req.body;
     if (!name) {
         return res.status(400).json({ error: "Participant name is required" });
     }
@@ -180,10 +198,10 @@ app.put('/api/participants/:id', (req, res) => {
 
     const sql = `
         UPDATE participants
-        SET name = ?, contact_info = ?, date_joined = ?, referred_by_participant_id = ?
+        SET name = ?, contact_info = ?, age = ?, gender = ?, main_address = ?, locality = ?, date_joined = ?, referred_by_participant_id = ?
         WHERE id = ?
     `;
-    const params = [name, contact_info, date_joined, referrerId, id];
+    const params = [name, contact_info, age, gender, main_address, locality, date_joined, referrerId, id];
 
     db.run(sql, params, function(err) {
         if (handleDatabaseError(err, res, `Error updating participant ${id}`)) return;
@@ -306,6 +324,142 @@ app.post('/api/attendance', (req, res) => {
     });
 });
 
+// == Dashboard Statistics ==
+// GET dashboard statistics
+app.get('/api/dashboard/stats', (req, res) => {
+    const dateParam = req.query.date;
+    const today = dateParam || new Date().toISOString().split('T')[0];
+    
+    // Requête pour le nombre total de participants
+    const totalParticipantsQuery = `
+        SELECT COUNT(*) as total FROM participants
+    `;
+
+    // Requête pour les participants par session
+    const attendanceBySessionQuery = `
+        SELECT 
+            s.session_date,
+            COUNT(a.participant_id) as attendance_count
+        FROM study_sessions s
+        LEFT JOIN attendance a ON s.id = a.session_id
+        WHERE a.attended = 1
+        GROUP BY s.session_date
+        ORDER BY s.session_date DESC
+        LIMIT 10
+    `;
+
+    // Requête pour les meilleurs parrains
+    const topReferrersQuery = `
+        SELECT 
+            p.id,
+            p.name,
+            COUNT(r.id) as referral_count
+        FROM participants p
+        LEFT JOIN participants r ON p.id = r.referred_by_participant_id
+        GROUP BY p.id
+        HAVING referral_count > 0
+        ORDER BY referral_count DESC
+        LIMIT 3
+    `;
+
+    // Requête pour les participants avec une présence parfaite
+    const perfectAttendanceQuery = `
+        WITH session_counts AS (
+            SELECT COUNT(*) as total_sessions
+            FROM study_sessions
+        ),
+        participant_attendance AS (
+            SELECT 
+                p.id,
+                p.name,
+                COUNT(a.id) as attended_sessions
+            FROM participants p
+            LEFT JOIN attendance a ON p.id = a.participant_id AND a.attended = 1
+            GROUP BY p.id
+        )
+        SELECT 
+            pa.id,
+            pa.name
+        FROM participant_attendance pa
+        CROSS JOIN session_counts sc
+        WHERE pa.attended_sessions = sc.total_sessions
+    `;
+
+    // Requête pour les participants présents aujourd'hui par quartier
+    const todayAttendanceByLocalityQuery = `
+        SELECT 
+            p.locality,
+            COUNT(DISTINCT a.participant_id) as present_count
+        FROM participants p
+        LEFT JOIN attendance a ON p.id = a.participant_id
+        LEFT JOIN study_sessions s ON a.session_id = s.id
+        WHERE s.session_date = ? AND a.attended = 1
+        GROUP BY p.locality
+        ORDER BY present_count DESC
+    `;
+
+    // Requête pour les nouvelles inscriptions par jour
+    const newParticipantsByDayQuery = `
+        SELECT 
+            date(date_joined) as join_date,
+            COUNT(*) as new_participants
+        FROM participants
+        GROUP BY date(date_joined)
+        ORDER BY join_date DESC
+        LIMIT 30
+    `;
+
+    db.all(totalParticipantsQuery, [], (err, totalResult) => {
+        if (err) {
+            console.error('Error getting total participants:', err);
+            return res.status(500).json({ error: 'Erreur lors de la récupération des statistiques' });
+        }
+
+        db.all(attendanceBySessionQuery, [], (err, attendanceResults) => {
+            if (err) {
+                console.error('Error getting attendance by session:', err);
+                return res.status(500).json({ error: 'Erreur lors de la récupération des statistiques' });
+            }
+
+            db.all(topReferrersQuery, [], (err, referrerResults) => {
+                if (err) {
+                    console.error('Error getting top referrers:', err);
+                    return res.status(500).json({ error: 'Erreur lors de la récupération des statistiques' });
+                }
+
+                db.all(perfectAttendanceQuery, [], (err, perfectAttendanceResults) => {
+                    if (err) {
+                        console.error('Error getting perfect attendance:', err);
+                        return res.status(500).json({ error: 'Erreur lors de la récupération des statistiques' });
+                    }
+
+                    db.all(todayAttendanceByLocalityQuery, [today], (err, localityResults) => {
+                        if (err) {
+                            console.error('Error getting today attendance by locality:', err);
+                            return res.status(500).json({ error: 'Erreur lors de la récupération des statistiques' });
+                        }
+
+                        db.all(newParticipantsByDayQuery, [], (err, newParticipantsResults) => {
+                            if (err) {
+                                console.error('Error getting new participants by day:', err);
+                                return res.status(500).json({ error: 'Erreur lors de la récupération des statistiques' });
+                            }
+
+                            res.json({
+                                totalParticipants: totalResult[0].total,
+                                attendanceBySession: attendanceResults,
+                                topReferrers: referrerResults,
+                                perfectAttendance: perfectAttendanceResults,
+                                todayAttendanceByLocality: localityResults,
+                                newParticipantsByDay: newParticipantsResults
+                            });
+                        });
+                    });
+                });
+            });
+        });
+    });
+});
 
 // --- Basic Error Handling for Unmatched Routes ---
 app.use((req, res) => {

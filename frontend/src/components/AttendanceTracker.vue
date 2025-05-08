@@ -40,7 +40,7 @@ const emit = defineEmits([
 // Local reactive copy of attendance records to track changes
 const localAttendance = ref([]);
 // Search term for filtering participants in the list
-const searchTerm = ref('');
+const searchQuery = ref('');
 // State for showing save confirmation message
 const showSaveConfirmation = ref(false);
 // State for potential errors specific to this component (e.g., if saving fails)
@@ -71,12 +71,13 @@ watch(() => props.initialAttendance, (newAttendanceData) => {
 // --- Computed Properties ---
 // Filter the local attendance records based on the search term
 const filteredAttendance = computed(() => {
-  if (!searchTerm.value) {
+  if (!searchQuery.value) {
     return localAttendance.value;
   }
-  const lowerSearch = searchTerm.value.toLowerCase();
+  const query = searchQuery.value.toLowerCase();
   return localAttendance.value.filter(att =>
-    att.participant_name.toLowerCase().includes(lowerSearch)
+    att.participant_name.toLowerCase().includes(query) ||
+    att.participant_id.toString().includes(query)
   );
 });
 
@@ -120,6 +121,32 @@ const requestDeleteSession = () => {
     emit('delete-session', props.session.id);
 };
 
+// Filter participants based on search query
+const filterParticipants = () => {
+    if (!searchQuery.value) {
+        localAttendance.value = props.initialAttendance;
+        return;
+    }
+
+    const query = searchQuery.value.toLowerCase();
+    localAttendance.value = props.initialAttendance.filter(record => 
+        record.participant_name.toLowerCase().includes(query) ||
+        record.participant_id.toString().includes(query)
+    );
+};
+
+// Initialize filtered attendance
+onMounted(() => {
+    localAttendance.value = props.initialAttendance;
+    filterParticipants();
+});
+
+// Watch for changes in attendance
+watch(() => props.initialAttendance, (newAttendance) => {
+    localAttendance.value = newAttendance;
+    filterParticipants();
+}, { deep: true });
+
 </script>
 
 <template>
@@ -149,9 +176,9 @@ const requestDeleteSession = () => {
         <input
           type="search"
           class="form-control"
-          placeholder="Search participants..."
-          v-model="searchTerm"
-          aria-label="Search participants in attendance list"
+          placeholder="Rechercher par nom ou ID..."
+          v-model="searchQuery"
+          @input="filterParticipants"
         >
       </div>
     </div>
@@ -171,13 +198,14 @@ const requestDeleteSession = () => {
           <thead class="table-light" style="position: sticky; top: 0; z-index: 1;">
             <tr>
               <th scope="col" class="text-center" style="width: 80px;">Attended</th>
-              <th scope="col">Participant Name</th>
-              </tr>
+              <th scope="col">ID</th>
+              <th scope="col">Nom</th>
+            </tr>
           </thead>
           <tbody>
             <tr v-if="!loading && filteredAttendance.length === 0">
-              <td colspan="2" class="text-center text-muted py-4">
-                {{ searchTerm ? 'No participants found matching search.' : (participants.length === 0 ? 'No participants exist in the system.' : 'No attendance records found.') }}
+              <td colspan="3" class="text-center text-muted py-4">
+                {{ searchQuery ? 'No participants found matching search.' : (participants.length === 0 ? 'No participants exist in the system.' : 'No attendance records found.') }}
               </td>
             </tr>
             <tr v-for="att in filteredAttendance" :key="att.participant_id">
@@ -193,12 +221,9 @@ const requestDeleteSession = () => {
                   >
                 </div>
               </td>
-              <td class="align-middle">
-                <label :for="'att-' + att.participant_id" class="form-check-label">
-                  {{ att.participant_name }}
-                </label>
-              </td>
-              </tr>
+              <td class="align-middle">{{ att.participant_id }}</td>
+              <td class="align-middle">{{ att.participant_name }}</td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -256,5 +281,31 @@ const requestDeleteSession = () => {
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: .5; }
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+.form-control-sm {
+    display: none;
+}
+
+.input-group-text {
+    background-color: #f8f9fa;
+    border-right: none;
+}
+
+.input-group .form-control {
+    border-left: none;
+}
+
+.input-group .form-control:focus {
+    border-color: #ced4da;
+    box-shadow: none;
+}
+
+.input-group:focus-within {
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
 }
 </style>

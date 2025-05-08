@@ -24,20 +24,20 @@ const emit = defineEmits(['edit-participant', 'delete-participant']);
 
 // --- State ---
 // Ref to store the user's search input
-const searchTerm = ref('');
+const searchQuery = ref('');
 
 // --- Computed Properties ---
-// Filters the participants array based on the searchTerm
+// Filters the participants array based on the searchQuery
 const filteredParticipants = computed(() => {
-  if (!searchTerm.value) {
+  if (!searchQuery.value) {
     return props.participants; // Return all if search is empty
   }
-  const lowerSearch = searchTerm.value.toLowerCase();
+  const query = searchQuery.value.toLowerCase();
   return props.participants.filter(p =>
-    p.name.toLowerCase().includes(lowerSearch) ||
-    (p.contact_info && p.contact_info.toLowerCase().includes(lowerSearch)) ||
-    (p.referrer_name && p.referrer_name.toLowerCase().includes(lowerSearch))
-    // Add other fields to search if needed
+    p.name.toLowerCase().includes(query) ||
+    p.id.toString().includes(query) ||
+    (p.referrer_name && p.referrer_name.toLowerCase().includes(query)) ||
+    (p.referred_by_participant_id && p.referred_by_participant_id.toString().includes(query))
   );
 });
 
@@ -55,6 +55,12 @@ const formatDate = (dateString) => {
         console.error("Error formatting date:", dateString, e);
         return 'Invalid Date';
     }
+};
+
+// Helper function to format gender display
+const formatGender = (gender) => {
+  if (!gender) return 'N/A';
+  return gender === 'M' ? 'Masculin' : gender === 'F' ? 'Féminin' : 'N/A';
 };
 
 // --- Methods ---
@@ -86,11 +92,11 @@ const handleDeleteClick = (participantId) => {
         <div class="input-group mt-2 mt-sm-0" style="max-width: 300px;">
           <span class="input-group-text"><Search :size="16"/></span>
           <input
-            type="search"
+            type="text"
             class="form-control form-control-sm"
-            placeholder="Search participants..."
-            v-model="searchTerm"
-            aria-label="Search participants"
+            placeholder="Rechercher par nom ou ID..."
+            v-model="searchQuery"
+            @input="filterParticipants"
           >
         </div>
       </div>
@@ -99,42 +105,52 @@ const handleDeleteClick = (participantId) => {
     <div class="card-body p-0">
       <div v-if="loading" class="text-center p-4 text-muted">
         <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
-        <span class="ms-2">Loading participants...</span>
+        <span class="ms-2">Chargement des participants...</span>
       </div>
 
       <div v-else class="table-responsive">
         <table class="table table-hover mb-0">
           <thead>
             <tr>
+              <th scope="col">ID</th>
               <th scope="col">Nom</th>
               <th scope="col">Contact</th>
+              <th scope="col">Âge</th>
+              <th scope="col">Genre</th>
+              <th scope="col">Adresse</th>
+              <th scope="col">Quartier</th>
               <th scope="col">Date</th>
-              <th scope="col">Referred By</th>
+              <th scope="col">Recommandé par</th>
               <th scope="col" class="text-end">Actions</th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="!loading && filteredParticipants.length === 0">
-              <td colspan="5" class="text-center text-muted py-4">
-                {{ searchTerm ? 'No participants found matching search.' : 'No participants added yet.' }}
+              <td colspan="10" class="text-center text-muted py-4">
+                {{ searchQuery ? 'Aucun participant trouvé.' : 'Aucun participant ajouté.' }}
               </td>
             </tr>
             <tr v-for="p in filteredParticipants" :key="p.id">
+              <td>{{ p.id }}</td>
               <td>{{ p.name }}</td>
               <td>{{ p.contact_info || 'N/A' }}</td>
+              <td>{{ p.age || 'N/A' }}</td>
+              <td>{{ formatGender(p.gender) }}</td>
+              <td>{{ p.main_address || 'N/A' }}</td>
+              <td>{{ p.locality || 'N/A' }}</td>
               <td>{{ formatDate(p.date_joined) }}</td>
-              <td>{{ p.referrer_name || '--' }}</td>
+              <td>{{ p.referrer_name ? `${p.referrer_name} (ID: ${p.referred_by_participant_id})` : '--' }}</td>
               <td>
                 <button
                   @click="handleEditClick(p)"
-                  title="Edit Participant"
+                  title="Modifier le participant"
                   class="btn btn-sm btn-outline-secondary me-1 px-1 py-0"
                 >
                   <Edit :size="16" />
                 </button>
                 <button
                   @click="handleDeleteClick(p.id)"
-                  title="Delete Participant"
+                  title="Supprimer le participant"
                   class="btn btn-sm btn-outline-danger px-1 py-0"
                 >
                   <Trash2 :size="16" />
