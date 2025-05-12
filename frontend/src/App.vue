@@ -308,28 +308,26 @@ const handleNavigation = (newView) => {
             <div class="row">
                 <!-- Navigation latérale -->
                 <div class="col-md-3">
-                    <div class="card mb-4">
-                        <div class="card-body">
-                            <h5 class="card-title mb-3">Menus</h5>
-                            <div class="list-group">
-                                <a href="#" class="list-group-item list-group-item-action" 
-                                   :class="{ 'active': view === 'dashboard' }"
-                                   @click.prevent="handleNavigation('dashboard')">
-                                    <BarChart2 class="me-2" :size="18" /> Dashboard
-                                </a>
-                                <a href="#" class="list-group-item list-group-item-action"
-                                   :class="{ 'active': view === 'participants' }"
-                                   @click.prevent="handleNavigation('participants')">
-                                    <Users class="me-2" :size="18" /> Liste des participants
-                                </a>
-                                <a href="#" class="list-group-item list-group-item-action"
-                                   :class="{ 'active': view === 'sessions' || view === 'attendance' }"
-                                   @click.prevent="handleNavigation('sessions')">
-                                    <Calendar class="me-2" :size="18" /> Sessions & Présence
-                                </a>
-                            </div>
+                    <nav class="sticky-top pt-3">
+                        <h5 class="ps-2 mb-2 text-muted small text-uppercase">Menu</h5>
+                        <div class="list-group list-group-flush">
+                            <a href="#" class="list-group-item list-group-item-action d-flex align-items-center"
+                               :class="{ 'active': view === 'dashboard' }"
+                               @click.prevent="handleNavigation('dashboard')">
+                                <BarChart2 class="me-2 flex-shrink-0" :size="20" /> Dashboard
+                            </a>
+                            <a href="#" class="list-group-item list-group-item-action d-flex align-items-center"
+                               :class="{ 'active': view === 'participants' }"
+                               @click.prevent="handleNavigation('participants')">
+                                <Users class="me-2 flex-shrink-0" :size="20" /> Participants
+                            </a>
+                            <a href="#" class="list-group-item list-group-item-action d-flex align-items-center"
+                               :class="{ 'active': view === 'sessions' || view === 'attendance' }"
+                               @click.prevent="handleNavigation('sessions')">
+                                <Calendar class="me-2 flex-shrink-0" :size="20" /> Sessions &amp; Présence
+                            </a>
                         </div>
-                    </div>
+                    </nav>
                 </div>
 
                 <!-- Contenu principal -->
@@ -404,8 +402,9 @@ const handleNavigation = (newView) => {
                                 />
                             </div>
                         </div>
-
-                        <!-- (ne rien afficher pour view === 'admin') -->
+                         <div v-if="view === 'admin'">
+                            <Admin />
+                        </div>
                     </main>
                 </div>
             </div>
@@ -508,10 +507,11 @@ body, html {
     /* d-flex flex-column min-vh-100 are applied via class */
 }
 
+/* Hide old nav pills if they were still there */
 .nav-pills .nav-link,
 .nav-pills .nav-link:hover,
 .nav-pills .nav-link.active {
-    display: none;
+    /* display: none; */ /* Commented out if you are not using .nav-pills anymore */
 }
 
 .card-header {
@@ -534,11 +534,9 @@ body, html {
      box-shadow: 0 0 0 0.25rem rgba(var(--bs-danger-rgb), 0.35);
 }
 
-/* Consider adding a nice font like Inter */
-/* @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap'); */
-/* Then apply `font-family: 'Inter', sans-serif;` to body or a main wrapper */
-
-/* Styles pour la modal de notification */
+/* Styles pour la modal de notification (if not using BaseModal) */
+/* These styles for .modal, .modal-backdrop, .modal-dialog, .modal-content might be redundant if Bootstrap handles them */
+/*
 .modal {
     position: fixed;
     top: 0;
@@ -565,24 +563,77 @@ body, html {
     position: relative;
     z-index: 9999;
 }
+*/
 
-/* Styles pour la navigation latérale */
+/* Styles pour la navigation latérale modernisée */
 .list-group-item {
-    border: none;
-    padding: 0.75rem 1rem;
-    color: #495057;
+    border-radius: 0.375rem; /* Add some rounding to items */
+    margin-bottom: 0.25rem; /* Add a small gap between items */
+    padding: 0.85rem 1rem; /* Adjust padding */
+    font-weight: 500; /* Slightly bolder text */
+    color: #495057; /* Standard text color */
+    border-left: 3px solid transparent; /* For active indicator */
+    transition: background-color 0.15s ease-in-out, border-left-color 0.15s ease-in-out, color 0.15s ease-in-out;
 }
 
 .list-group-item:hover {
-    background-color: #f8f9fa;
+    background-color: #e9ecef; /* Lighter hover background */
+    color: #0d6efd; /* Primary color on hover for text */
+    border-left-color: #cfe2ff; /* Light primary color for border on hover */
 }
 
 .list-group-item.active {
-    background-color: #0d6efd;
-    border-color: #0d6efd;
+    background-color: #cfe2ff; /* Light primary background for active */
+    color: #0a58ca; /* Darker primary color for active text */
+    border-left-color: #0d6efd; /* Solid primary color for active indicator */
+    font-weight: 600;
 }
 
-.list-group-item.active:hover {
-    background-color: #0b5ed7;
+.list-group-item.active .lucide { /* Style icons in active item */
+    color: #0a58ca;
 }
+
+.list-group-item .lucide { /* Default icon color */
+    color: #6c757d; /* Muted icon color */
+    transition: color 0.15s ease-in-out;
+}
+
+.list-group-item:hover .lucide {
+    color: #0d6efd; /* Icon color on hover */
+}
+
+.list-group.list-group-flush .list-group-item {
+    border-right: 0; /* Remove right border from flush items */
+    border-top: 0; /* Remove top border from flush items */
+    border-bottom: 0; /* Remove bottom border from flush items */
+    /* border-left is handled above for active state */
+}
+
+.list-group.list-group-flush .list-group-item:last-child {
+    margin-bottom: 0; /* No margin for the last item */
+}
+
+/* Ensure sticky navigation works well */
+.sticky-top {
+    top: 1rem; /* Adjust based on your header or desired spacing */
+    align-self: flex-start; /* Important for sticky positioning in flex containers */
+    height: calc(100vh - 2rem - 70px); /* Adjust 70px based on your header height, and 2rem for top/bottom padding */
+    overflow-y: auto; /* Allow scrolling if menu items exceed height */
+}
+
+/* Webkit scrollbar styling for sticky nav */
+.sticky-top::-webkit-scrollbar {
+    width: 6px;
+}
+.sticky-top::-webkit-scrollbar-track {
+    background: transparent;
+}
+.sticky-top::-webkit-scrollbar-thumb {
+    background: #ced4da;
+    border-radius: 3px;
+}
+.sticky-top::-webkit-scrollbar-thumb:hover {
+    background: #adb5bd;
+}
+
 </style>
