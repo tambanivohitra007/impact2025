@@ -152,11 +152,8 @@ watch(() => props.initialAttendance, (newAttendance) => {
 <template>
   <div class="card shadow-sm">
     <div class="card-header bg-light p-3">
-      <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center mb-2">
-        <button @click="goBack" class="btn btn-sm btn-outline-secondary mb-2 mb-sm-0">
-          <ChevronLeft class="me-1" :size="16" /> Back to Sessions
-        </button>
-        <div v-if="showSaveConfirmation" class="alert alert-success py-1 px-2 small animate-pulse mb-2 mb-sm-0" role="alert">
+      <div class="d-flex justify-content-end align-items-center mb-2">
+        <div v-if="showSaveConfirmation" class="alert alert-success py-1 px-2 small animate-pulse me-2 mb-0" role="alert">
           Attendance saved!
         </div>
         <button @click="requestDeleteSession" title="Delete Session" class="btn btn-sm btn-danger">
@@ -167,10 +164,11 @@ watch(() => props.initialAttendance, (newAttendance) => {
       <h5 class="card-title mb-1 d-flex align-items-center">
         <UserCheck class="me-2" :size="20" /> Attendance for {{ formatDate(session.session_date) }}
       </h5>
-      <p class="card-subtitle text-muted small mb-2">
+      <p class="card-subtitle text-muted small mb-2 text-start">
         Topic: {{ session.topic || 'N/A' }} |
         Attended: {{ attendanceCount.attended }} / {{ attendanceCount.total }}
       </p>
+
        <div class="input-group input-group-sm" style="max-width: 300px;">
         <span class="input-group-text"><Search :size="16"/></span>
         <input

@@ -32,6 +32,7 @@ const db = new sqlite3.Database(DB_PATH, (err) => {
                     locality TEXT,
                     date_joined DATE DEFAULT CURRENT_DATE,
                     referred_by_participant_id INTEGER,
+                    joining_reason TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (referred_by_participant_id) REFERENCES participants(id) ON DELETE SET NULL
@@ -139,6 +140,46 @@ app.get('/api/participants', (req, res) => {
     });
 });
 
+// GET new participants grouped by creation date (optionally filtered by from=YYYY-MM-DD)
+app.get('/api/participants/daily-join-stats', (req, res) => {
+    const { from } = req.query;
+
+    const baseQuery = `
+        SELECT date(created_at) as date, COUNT(*) as new_participants
+        FROM participants
+        WHERE created_at IS NOT NULL
+        ${from ? `AND date(created_at) >= date(?)` : ''}
+        GROUP BY date
+        ORDER BY date ASC
+    `;
+
+    const params = from ? [from] : [];
+
+    db.all(baseQuery, params, (err, rows) => {
+        if (handleDatabaseError(err, res, "Error fetching daily participant stats")) return;
+        res.json(rows);
+    });
+});
+
+// GET number of participants grouped by joining_reason
+app.get('/api/participants/joining-reasons-stats', (req, res) => {
+    const sql = `
+        SELECT 
+            joining_reason,
+            COUNT(*) as count
+        FROM participants
+        GROUP BY joining_reason
+        ORDER BY count DESC
+    `;
+
+    db.all(sql, [], (err, rows) => {
+        if (handleDatabaseError(err, res, "Error fetching joining reason stats")) return;
+        res.json(rows);
+    });
+});
+
+
+
 // GET a single participant by ID (including referrer name)
 app.get('/api/participants/:id', (req, res) => {
     const { id } = req.params;
@@ -161,15 +202,15 @@ app.get('/api/participants/:id', (req, res) => {
 
 // POST a new participant
 app.post('/api/participants', (req, res) => {
-    const { name, contact_info, age, gender, main_address, locality, date_joined, referred_by_participant_id } = req.body;
+    const { name, contact_info, age, gender, main_address, locality, date_joined, referred_by_participant_id, joining_reason } = req.body;
     if (!name) {
         return res.status(400).json({ error: "Participant name is required" });
     }
     // Ensure referred_by_participant_id is null if empty or invalid
     const referrerId = (referred_by_participant_id && !isNaN(parseInt(referred_by_participant_id))) ? parseInt(referred_by_participant_id) : null;
 
-    const sql = `INSERT INTO participants (name, contact_info, age, gender, main_address, locality, date_joined, referred_by_participant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
-    const params = [name, contact_info, age, gender, main_address, locality, date_joined || new Date().toISOString().split('T')[0], referrerId];
+    const sql = `INSERT INTO participants (name, contact_info, age, gender, main_address, locality, date_joined, referred_by_participant_id, joining_reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    const params = [name, contact_info, age, gender, main_address, locality, date_joined || new Date().toISOString().split('T')[0], referrerId, joining_reason];
 
     db.run(sql, params, function(err) {
         if (handleDatabaseError(err, res, "Error adding participant")) return;
@@ -182,7 +223,8 @@ app.post('/api/participants', (req, res) => {
             main_address,
             locality,
             date_joined: params[6],
-            referred_by_participant_id: referrerId
+            referred_by_participant_id: referrerId,
+            joining_reason
         });
     });
 });
@@ -190,7 +232,7 @@ app.post('/api/participants', (req, res) => {
 // PUT (update) an existing participant
 app.put('/api/participants/:id', (req, res) => {
     const { id } = req.params;
-    const { name, contact_info, age, gender, main_address, locality, date_joined, referred_by_participant_id } = req.body;
+    const { name, contact_info, age, gender, main_address, locality, date_joined, referred_by_participant_id, joining_reason } = req.body;
     if (!name) {
         return res.status(400).json({ error: "Participant name is required" });
     }
@@ -198,10 +240,10 @@ app.put('/api/participants/:id', (req, res) => {
 
     const sql = `
         UPDATE participants
-        SET name = ?, contact_info = ?, age = ?, gender = ?, main_address = ?, locality = ?, date_joined = ?, referred_by_participant_id = ?
+        SET name = ?, contact_info = ?, age = ?, gender = ?, main_address = ?, locality = ?, date_joined = ?, referred_by_participant_id = ?, joining_reason = ?
         WHERE id = ?
     `;
-    const params = [name, contact_info, age, gender, main_address, locality, date_joined, referrerId, id];
+    const params = [name, contact_info, age, gender, main_address, locality, date_joined, referrerId, joining_reason, id];
 
     db.run(sql, params, function(err) {
         if (handleDatabaseError(err, res, `Error updating participant ${id}`)) return;
@@ -364,26 +406,18 @@ app.get('/api/dashboard/stats', (req, res) => {
 
     // Requête pour les participants avec une présence parfaite
     const perfectAttendanceQuery = `
-        WITH session_counts AS (
-            SELECT COUNT(*) as total_sessions
-            FROM study_sessions
-        ),
-        participant_attendance AS (
-            SELECT 
-                p.id,
-                p.name,
-                COUNT(a.id) as attended_sessions
-            FROM participants p
-            LEFT JOIN attendance a ON p.id = a.participant_id AND a.attended = 1
-            GROUP BY p.id
-        )
-        SELECT 
-            pa.id,
-            pa.name
-        FROM participant_attendance pa
-        CROSS JOIN session_counts sc
-        WHERE pa.attended_sessions = sc.total_sessions
-    `;
+    SELECT 
+        p.id,
+        p.name,
+        COUNT(a.id) as attended_sessions,
+        (SELECT COUNT(*) FROM study_sessions) as total_sessions
+    FROM participants p
+    LEFT JOIN attendance a ON p.id = a.participant_id AND a.attended = 1
+    GROUP BY p.id
+    HAVING attended_sessions > 0
+    ORDER BY attended_sessions DESC
+    LIMIT 10
+`;
 
     // Requête pour les participants présents aujourd'hui par quartier
     const todayAttendanceByLocalityQuery = `

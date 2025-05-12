@@ -56,11 +56,16 @@ const handleDeleteSessionClick = (sessionId) => {
 <template>
   <div class="card shadow-sm">
     <div class="card-header bg-light p-3">
-      <h5 class="card-title mb-1 d-flex align-items-center">
-        <Calendar class="me-2" :size="20" /> Study Sessions
-      </h5>
-      <p class="card-subtitle text-muted small">View past sessions or track attendance.</p>
+      <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center">
+        <div>
+          <h5 class="card-title mb-1 d-flex align-items-center">
+            <Calendar class="me-2" :size="20" /> Study Sessions
+          </h5>
+          <p class="card-subtitle text-muted small">View past sessions or track attendance.</p>
+        </div>
+        
       </div>
+    </div>
 
     <div class="card-body p-0">
       <div v-if="loading" class="text-center p-4 text-muted">
@@ -107,7 +112,7 @@ const handleDeleteSessionClick = (sessionId) => {
         </table>
       </div>
     </div>
-     </div>
+  </div>
 </template>
 
 <style scoped>

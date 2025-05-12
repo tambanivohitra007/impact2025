@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { Users, TrendingUp, Award } from 'lucide-vue-next';
 import Chart from 'chart.js/auto';
 
@@ -13,6 +13,27 @@ const stats = ref({
 
 const loading = ref(true);
 const error = ref(null);
+
+const totalPresentToday = computed(() => {
+  return stats.value.todayAttendanceByLocality?.reduce((sum, row) => sum + row.present_count, 0) || 0;
+});
+
+const joiningReasonsStats = ref([]);
+
+const newParticipantsByDay = ref([]);
+const NEW_PARTICIPANTS_START_DATE = '2025-05-07';
+
+const fetchNewParticipantsByDay = async () => {
+  try {
+    const response = await fetch(`http://localhost:3001/api/participants/daily-join-stats?from=${NEW_PARTICIPANTS_START_DATE}`);
+    if (!response.ok) throw new Error('Échec du chargement des participants par jour');
+    newParticipantsByDay.value = await response.json();
+  } catch (err) {
+    console.error("Erreur lors du chargement des participants par jour :", err);
+  }
+};
+
+
 
 // Fetch dashboard statistics
 const fetchStats = async () => {
@@ -66,10 +87,59 @@ const initAttendanceChart = () => {
     });
 };
 
+const initNewParticipantsChart = () => {
+  const ctx = document.getElementById('newParticipantsChart');
+  if (!ctx || !newParticipantsByDay.value.length) return;
+
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: newParticipantsByDay.value.map(d => new Date(d.date).toLocaleDateString()),
+      datasets: [{
+        label: 'Nouveaux participants / jour',
+        data: newParticipantsByDay.value.map(d => d.new_participants),
+        backgroundColor: 'rgba(54, 162, 235, 0.6)'
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        title: {
+          display: true,
+          text: 'Nouveaux participants à partir du 7 mai 2025'
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            stepSize: 1
+          }
+        }
+      }
+    }
+  });
+};
+
+const fetchJoiningReasonsStats = async () => {
+  try {
+    const response = await fetch('http://localhost:3001/api/participants/joining-reasons-stats');
+    if (!response.ok) throw new Error('Échec du chargement des raisons de participation');
+    joiningReasonsStats.value = await response.json();
+  } catch (err) {
+    console.error("Erreur lors du chargement des raisons :", err);
+  }
+};
+
+
 onMounted(async () => {
-    await fetchStats();
-    initAttendanceChart();
+  await fetchStats();
+  await fetchNewParticipantsByDay();
+  await fetchJoiningReasonsStats();
+  initAttendanceChart();
+  initNewParticipantsChart();
 });
+
 </script>
 
 <template>
@@ -81,9 +151,16 @@ onMounted(async () => {
           <div class="card-body">
             <h5 class="card-title d-flex align-items-center">
               <Users class="me-2" :size="24" />
-              Total Participants
+              Statistiques globales
             </h5>
-            <p class="display-4 mb-0">{{ stats.totalParticipants }}</p>
+            <p class="mb-2">
+              <strong>Total participants :</strong><br />
+              <span class="display-6">{{ stats.totalParticipants }}</span>
+            </p>
+            <p class="mb-0">
+              <strong>Présents aujourd’hui :</strong><br />
+              <span class="fs-4 text-success">{{ totalPresentToday }}</span>
+            </p>
           </div>
         </div>
       </div>
@@ -131,34 +208,15 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- Perfect Attendance -->
+      <!-- New Participants Chart -->
       <div class="col-12">
         <div class="card">
           <div class="card-body">
             <h5 class="card-title d-flex align-items-center">
-              <Award class="me-2" :size="24" />
-              Participants Assidus
+              <Users class="me-2" :size="24" />
+              Nouveaux participants par jour
             </h5>
-            <div class="table-responsive">
-              <table class="table">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Nom</th>
-                    <th>Sessions suivies</th>
-                    <th>Total sessions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="p in stats.perfectAttendance" :key="p.id">
-                    <td>{{ p.id }}</td>
-                    <td>{{ p.name }}</td>
-                    <td>{{ p.attended_sessions }}</td>
-                    <td>{{ p.total_sessions }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+            <canvas id="newParticipantsChart"></canvas>
           </div>
         </div>
       </div>
@@ -192,6 +250,68 @@ onMounted(async () => {
           </div>
         </div>
       </div>
+
+      <!-- Section : Raisons de participation -->
+      <div class="row mt-4">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-body">
+              <h5 class="card-title mb-3">Raisons de participation</h5>
+              <div class="table-responsive">
+                <table class="table table-bordered mb-0">
+                  <thead>
+                    <tr>
+                      <th>Motif</th>
+                      <th>Nombre de participants</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-if="!joiningReasonsStats.length">
+                      <td colspan="2" class="text-center text-muted">Aucune donnée disponible</td>
+                    </tr>
+                    <tr v-for="row in joiningReasonsStats" :key="row.joining_reason || 'unknown'">
+                      <td>{{ row.joining_reason || 'Non spécifié' }}</td>
+                      <td>{{ row.count }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Perfect Attendance -->
+      <div class="col-12">
+        <div class="card">
+          <div class="card-body">
+            <h5 class="card-title d-flex align-items-center">
+              <Award class="me-2" :size="24" />
+              Participants Assidus
+            </h5>
+            <div class="table-responsive">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Nom</th>
+                    <th>Sessions suivies</th>
+                    <th>Total sessions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="p in stats.perfectAttendance" :key="p.id">
+                    <td>{{ p.id }}</td>
+                    <td>{{ p.name }}</td>
+                    <td>{{ p.attended_sessions }}</td>
+                    <td>{{ p.total_sessions }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -213,4 +333,9 @@ onMounted(async () => {
 .table td {
     vertical-align: middle;
 }
+canvas {
+  width: 100% !important;
+  height: auto !important;
+}
+
 </style> 

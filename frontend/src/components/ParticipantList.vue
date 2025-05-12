@@ -24,20 +24,21 @@ const emit = defineEmits(['edit-participant', 'delete-participant']);
 
 // --- State ---
 // Ref to store the user's search input
-const searchQuery = ref('');
+const searchTerm = ref('');
 
 // --- Computed Properties ---
-// Filters the participants array based on the searchQuery
+// Filters the participants array based on the searchTerm
 const filteredParticipants = computed(() => {
-  if (!searchQuery.value) {
+  if (!searchTerm.value) {
     return props.participants; // Return all if search is empty
   }
-  const query = searchQuery.value.toLowerCase();
+  const lowerSearch = searchTerm.value.toLowerCase();
   return props.participants.filter(p =>
-    p.name.toLowerCase().includes(query) ||
-    p.id.toString().includes(query) ||
-    (p.referrer_name && p.referrer_name.toLowerCase().includes(query)) ||
-    (p.referred_by_participant_id && p.referred_by_participant_id.toString().includes(query))
+    p.name.toLowerCase().includes(lowerSearch) ||
+    (p.contact_info && p.contact_info.toLowerCase().includes(lowerSearch)) ||
+    (p.referrer_name && p.referrer_name.toLowerCase().includes(lowerSearch)) ||
+    (p.main_address && p.main_address.toLowerCase().includes(lowerSearch)) ||
+    (p.locality && p.locality.toLowerCase().includes(lowerSearch))
   );
 });
 
@@ -55,12 +56,6 @@ const formatDate = (dateString) => {
         console.error("Error formatting date:", dateString, e);
         return 'Invalid Date';
     }
-};
-
-// Helper function to format gender display
-const formatGender = (gender) => {
-  if (!gender) return 'N/A';
-  return gender === 'M' ? 'Masculin' : gender === 'F' ? 'Féminin' : 'N/A';
 };
 
 // --- Methods ---
@@ -92,11 +87,11 @@ const handleDeleteClick = (participantId) => {
         <div class="input-group mt-2 mt-sm-0" style="max-width: 300px;">
           <span class="input-group-text"><Search :size="16"/></span>
           <input
-            type="text"
+            type="search"
             class="form-control form-control-sm"
-            placeholder="Rechercher par nom ou ID..."
-            v-model="searchQuery"
-            @input="filterParticipants"
+            placeholder="Rechercher des participants..."
+            v-model="searchTerm"
+            aria-label="Rechercher des participants"
           >
         </div>
       </div>
@@ -112,34 +107,26 @@ const handleDeleteClick = (participantId) => {
         <table class="table table-hover mb-0">
           <thead>
             <tr>
-              <th scope="col">ID</th>
               <th scope="col">Nom</th>
               <th scope="col">Contact</th>
               <th scope="col">Âge</th>
-              <th scope="col">Genre</th>
               <th scope="col">Adresse</th>
               <th scope="col">Quartier</th>
-              <th scope="col">Date</th>
-              <th scope="col">Recommandé par</th>
               <th scope="col" class="text-end">Actions</th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="!loading && filteredParticipants.length === 0">
-              <td colspan="10" class="text-center text-muted py-4">
-                {{ searchQuery ? 'Aucun participant trouvé.' : 'Aucun participant ajouté.' }}
+              <td colspan="8" class="text-center text-muted py-4">
+                {{ searchTerm ? 'Aucun participant trouvé.' : 'Aucun participant ajouté.' }}
               </td>
             </tr>
             <tr v-for="p in filteredParticipants" :key="p.id">
-              <td>{{ p.id }}</td>
               <td>{{ p.name }}</td>
               <td>{{ p.contact_info || 'N/A' }}</td>
               <td>{{ p.age || 'N/A' }}</td>
-              <td>{{ formatGender(p.gender) }}</td>
               <td>{{ p.main_address || 'N/A' }}</td>
               <td>{{ p.locality || 'N/A' }}</td>
-              <td>{{ formatDate(p.date_joined) }}</td>
-              <td>{{ p.referrer_name ? `${p.referrer_name} (ID: ${p.referred_by_participant_id})` : '--' }}</td>
               <td>
                 <button
                   @click="handleEditClick(p)"
@@ -148,13 +135,13 @@ const handleDeleteClick = (participantId) => {
                 >
                   <Edit :size="16" />
                 </button>
-                <button
+                <!-- <button
                   @click="handleDeleteClick(p.id)"
                   title="Supprimer le participant"
                   class="btn btn-sm btn-outline-danger px-1 py-0"
                 >
                   <Trash2 :size="16" />
-                </button>
+                </button> -->
               </td>
             </tr>
           </tbody>

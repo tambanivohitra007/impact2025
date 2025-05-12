@@ -285,11 +285,23 @@ const handleNavigation = (newView) => {
     <div class="app-wrapper bg-light min-vh-100 d-flex flex-column">
         <!-- HEADER TOUJOURS VISIBLE -->
         <header class="py-3 py-md-4 text-center shadow-sm bg-white">
-            <h1 class="h2 mb-1 d-flex align-items-center justify-content-center gap-2 text-primary">
-                <BookOpen :size="30" /> IMPACT 2025
-            </h1>
-            <p class="text-muted small mb-0">Participant & Attendance Tracker</p>
+            <div class="d-flex justify-content-between align-items-center container">
+                <!-- Logo gauche -->
+                <img src="/impact.png" alt="Logo gauche" style="height: 100px;" />
+
+                <!-- Titre central -->
+                <div>
+                    <h1 class="h2 mb-1 d-flex align-items-center justify-content-center gap-2 text-primary">
+                        <BookOpen :size="30" /> IMPACT 2025
+                    </h1>
+                    <p class="text-muted small mb-0">Participant & Attendance Tracker</p>
+                </div>
+
+                <!-- Logo droite -->
+                <img src="/MAHABO.png" alt="Logo droite" style="height: 100px;" />
+            </div>
         </header>
+
 
         <div v-if="error" class="alert alert-danger alert-dismissible fade show container mt-3 mb-0" role="alert">
              <AlertCircle class="me-2 flex-shrink-0" :size="20" />
@@ -493,7 +505,7 @@ const handleNavigation = (newView) => {
 <style>
 /* Global styles (consider moving to a separate CSS file imported in main.js or a <style> tag in index.html) */
 body, html {
-    height: 100%;
+    min-height: 100%;
     margin: 0;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }

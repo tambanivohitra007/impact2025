@@ -32,6 +32,7 @@ const formData = reactive({
   locality: '',
   date_joined: '',
   referred_by_participant_id: '',
+  joining_reason: '',
 });
 // Ref to store any validation or API errors for display
 const formError = ref('');
@@ -55,6 +56,10 @@ const formatDateForInput = (dateString) => {
 // Helper to get today's date in YYYY-MM-DD format
 const todayDateString = () => new Date().toLocaleDateString('en-CA');
 
+const showCustomLocality = ref(false);
+const customLocality = ref('');
+
+
 // Function to reset the form fields based on the initialParticipant prop
 const resetForm = (participant) => {
   formData.id = participant?.id || null;
@@ -64,8 +69,11 @@ const resetForm = (participant) => {
   formData.gender = participant?.gender || '';
   formData.main_address = participant?.main_address || '';
   formData.locality = participant?.locality || '';
+  showCustomLocality.value = !['Mahabo', 'Andoharanofotsy', 'Manandona', 'Iavoloha'].includes(formData.locality);
+  customLocality.value = showCustomLocality.value ? formData.locality : '';
   formData.date_joined = formatDateForInput(participant?.date_joined) || todayDateString();
   formData.referred_by_participant_id = participant?.referred_by_participant_id || '';
+  formData.joining_reason = participant?.joining_reason || '';
   formError.value = ''; // Clear any previous errors
 };
 
@@ -104,11 +112,13 @@ const submit = async () => {
     age: formData.age ? parseInt(formData.age) : null,
     gender: formData.gender || null,
     main_address: formData.main_address.trim(),
-    locality: formData.locality.trim(),
+    locality: showCustomLocality.value ? customLocality.value.trim() : formData.locality.trim(),
     date_joined: formData.date_joined,
     referred_by_participant_id: formData.referred_by_participant_id
                                   ? parseInt(formData.referred_by_participant_id, 10)
                                   : null,
+    joining_reason: formData.joining_reason || null
+
   };
 
   // Emit the 'save' event with the data
@@ -198,12 +208,31 @@ defineExpose({
 
     <div class="mb-3">
       <label for="part-form-locality" class="form-label">Quartier</label>
-      <input
+      <select
         id="part-form-locality"
         v-model="formData.locality"
+        @change="showCustomLocality = formData.locality === 'Autre'"
+        class="form-select form-select-sm"
+        :disabled="saving"
+      >
+        <option value="">-- Sélectionner un quartier --</option>
+        <option value="Mahabo">Mahabo</option>
+        <option value="Andoharanofotsy">Andoharanofotsy</option>
+        <option value="Manandona">Manandona</option>
+        <option value="Iavoloha">Iavoloha</option>
+        <option value="Autre">Autre</option>
+      </select>
+    </div>
+
+    <div class="mb-3" v-if="showCustomLocality">
+      <label for="custom-locality" class="form-label">Nom du quartier</label>
+      <input
+        id="custom-locality"
+        v-model="customLocality"
         type="text"
         class="form-control form-control-sm"
         :disabled="saving"
+        placeholder="Entrer le nom du quartier"
       >
     </div>
 
@@ -229,8 +258,26 @@ defineExpose({
       >
         <option value="">-- Aucun --</option>
         <option v-for="p in availableReferrers" :key="p.id" :value="p.id">
-          {{ p.name }}
+          {{ p.id }}
         </option>
+      </select>
+    </div>  
+
+    <div class="mb-3">
+      <label for="joining_reason" class="form-label">Motif d'inscription</label>
+      <select
+        id="joining_reason"
+        v-model="formData.joining_reason"
+        class="form-select form-select-sm"
+        :disabled="saving"
+      >
+        <option value="">-- Sélectionner un motif --</option>
+        <option value="Tracte">Tracte</option>
+        <option value="Affiche">Affiche</option>
+        <option value="Amis/Famille">Amis / Famille</option>
+        <option value="Radio">Radio</option>
+        <option value="Social media">Réseaux sociaux</option>
+        <option value="Autres">Autres</option>
       </select>
     </div>
 
