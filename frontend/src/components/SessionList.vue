@@ -1,9 +1,8 @@
 <script setup>
-import { Calendar, UserCheck, Trash2 } from 'lucide-vue-next'; // Import necessary icons
+import { computed } from 'vue'; // Import computed if needed, though not strictly used in this version for filtering
+import { Calendar, UserCheck, Trash2, ListChecks, PlusCircle } from 'lucide-vue-next';
 
 // --- Props ---
-// sessions: The array of session objects passed from the parent (App.vue)
-// loading: Boolean indicating if the session data is currently being fetched
 const props = defineProps({
   sessions: {
     type: Array,
@@ -17,20 +16,20 @@ const props = defineProps({
 });
 
 // --- Emits ---
-// view-attendance: Emits the session object when the 'Attendance' button is clicked
-// delete-session: Emits the session ID when the 'Delete' button is clicked
-const emit = defineEmits(['view-attendance', 'delete-session']);
+const emit = defineEmits([
+    'view-attendance',
+    'delete-session',
+    'add-new-session' // New event for the add button
+]);
 
 // --- Helper Functions ---
-// Formats date string to a readable format (e.g., YYYY-MM-DD)
 const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     try {
         const date = new Date(dateString);
-        // Adjust for timezone offset to display the correct local date
         const offset = date.getTimezoneOffset() * 60000;
         const adjustedDate = new Date(date.getTime() + offset);
-        return adjustedDate.toLocaleDateString('en-CA'); // Or 'en-US', etc.
+        return adjustedDate.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
     } catch (e) {
         console.error("Error formatting date:", dateString, e);
         return 'Invalid Date';
@@ -38,90 +37,136 @@ const formatDate = (dateString) => {
 };
 
 // --- Methods ---
-// Emits the 'view-attendance' event with the session object
 const handleViewAttendanceClick = (session) => {
   emit('view-attendance', session);
 };
 
-// Emits the 'delete-session' event with the session ID
 const handleDeleteSessionClick = (sessionId) => {
-  // Optional: Add confirmation dialog here if preferred within the component
-  // if (confirm('Are you sure you want to delete this session and its attendance records?')) {
-       emit('delete-session', sessionId);
-  // }
+  emit('delete-session', sessionId);
+};
+
+const handleAddNewSessionClick = () => {
+  emit('add-new-session'); // Emit event to be caught by App.vue
 };
 
 </script>
 
 <template>
-  <div class="card shadow-sm">
-    <div class="card-header bg-light p-3">
-      <h5 class="card-title mb-1 d-flex align-items-center">
-        <Calendar class="me-2" :size="20" /> Study Sessions
-      </h5>
-      <p class="card-subtitle text-muted small">View past sessions or track attendance.</p>
+  <div class="card w-100 shadow-sm mb-4 h-100 d-flex flex-column">
+    <div class="card-header bg-light p-3 flex-shrink-0">
+      <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center">
+        <h2 class="h5 mb-2 mb-sm-0 text-primary d-flex align-items-center">
+          <ListChecks class="me-2" :size="22" /> Session List
+          <span class="badge bg-secondary ms-2">{{ sessions.length }}</span>
+        </h2>
+        <button @click="handleAddNewSessionClick" class="btn btn-primary btn-sm d-flex align-items-center">
+            <PlusCircle class="me-1" :size="16" /> Add Session
+        </button>
+      </div>      
+    </div>
+
+    <div class="card-body p-0 flex-grow-1" style="overflow-y: auto;">
+      <div v-if="loading" class="text-center p-5 text-muted d-flex flex-column justify-content-center align-items-center h-100">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2 mb-0">Loading sessions...</p>
       </div>
 
-    <div class="card-body p-0">
-      <div v-if="loading" class="text-center p-4 text-muted">
-        <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
-        <span class="ms-2">Loading sessions...</span>
+      <div v-else-if="!sessions.length" class="text-center p-5 text-muted d-flex flex-column justify-content-center align-items-center h-100">
+        <Calendar :size="48" class="mb-2" />
+        <p class="mb-1 fw-bold">No sessions recorded yet.</p>
+        <p class="small">Click "Add Session" to create one.</p>
       </div>
 
-      <div v-else class="table-responsive">
-        <table class="table table-hover table-striped mb-0">
-          <thead>
-            <tr>
-              <th scope="col">Date</th>
-              <th scope="col">Topic</th>
-              <th scope="col" class="text-end">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="!loading && sessions.length === 0">
-              <td colspan="3" class="text-center text-muted py-4">
-                No sessions recorded yet.
-              </td>
-            </tr>
-            <tr v-for="s in sessions" :key="s.id">
-              <td class="fw-medium align-middle">{{ formatDate(s.session_date) }}</td>
-              <td class="align-middle">{{ s.topic || 'N/A' }}</td>
-              <td class="text-end align-middle">
+      <div v-else class="list-group list-group-flush">
+        <div
+          v-for="s in sessions"
+          :key="s.id"
+          class="list-group-item list-group-item-action py-2"
+          >
+          <div class="row align-items-center g-2">
+            <div class="col">
+              <div class="d-flex flex-column">
+                <span class="fw-bold text-primary">{{ formatDate(s.session_date) }}</span>
+                <small class="text-muted text-truncate" :title="s.topic || 'General Study'">{{ s.topic || 'General Study' }}</small>
+              </div>
+            </div>
+
+            <div class="col-auto">
+              <div class="btn-group" role="group" aria-label="Session actions">
                 <button
                   @click="handleViewAttendanceClick(s)"
                   title="View/Edit Attendance"
-                  class="btn btn-sm btn-outline-primary me-1"
+                  class="btn btn-sm btn-outline-primary d-flex align-items-center px-2 py-1"
                 >
-                  <UserCheck class="me-1" :size="16" /> Attendance
+                  <UserCheck :size="16" class="me-1 d-none d-sm-inline-block" />
+                  <span class="d-sm-none"><UserCheck :size="18" /></span>
+                  <span class="d-none d-sm-inline">Attendance</span>
                 </button>
                 <button
                   @click="handleDeleteSessionClick(s.id)"
                   title="Delete Session"
-                  class="btn btn-sm btn-outline-danger px-1 py-0"
+                  class="btn btn-sm btn-outline-danger d-flex align-items-center px-2 py-1"
                 >
                   <Trash2 :size="16" />
                 </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
-     </div>
+  </div>
 </template>
 
 <style scoped>
-/* Scoped styles for SessionList component */
-.table th {
-    font-weight: 500;
-    white-space: nowrap;
+/* Ensure card takes full height if it's a flex item in parent */
+.card.d-flex.flex-column {
+    /* Height is managed by parent flex container */
 }
-.table td {
+.card-body {
+    /* If the list inside is too long, this allows the body to scroll */
+}
+
+.list-group-item {
+    padding-left: var(--bs-gutter-x, 0.75rem);
+    padding-right: var(--bs-gutter-x, 0.75rem);
+    /* border-left: 0;
+    border-right: 0; */ /* Handled by list-group-flush */
+}
+.card-title .badge {
+    font-size: 0.7em;
+    padding: 0.3em 0.5em;
     vertical-align: middle;
 }
 .btn-sm {
-    /* Ensure buttons align well */
-    display: inline-flex;
-    align-items: center;
+    font-size: 0.8rem;
+}
+.btn-group .btn {
+    border-radius: 0.2rem;
+}
+.btn-group .btn:not(:last-child) {
+    margin-right: 5px;
+}
+.btn-group .btn:focus {
+    box-shadow: 0 0 0 0.2rem rgba(var(--bs-primary-rgb),.25);
+}
+.btn-outline-danger:focus {
+     box-shadow: 0 0 0 0.2rem rgba(var(--bs-danger-rgb),.25);
+}
+.btn svg {
+    vertical-align: -2px;
+}
+.text-truncate { /* Ensure long topics don't break layout */
+    max-width: 200px; /* Adjust as needed, or use more complex CSS for truncation */
+}
+@media (min-width: 576px) { /* sm breakpoint */
+    .text-truncate {
+        max-width: none; /* Allow more space on larger screens */
+    }
+}
+.card-header h2.h5 {
+    margin-bottom: 0 !important;
 }
 </style>

@@ -79,9 +79,10 @@ defineExpose({
 
 </script>
 
+// ...existing code...
 <template>
   <form @submit.prevent="submit">
-    <div v-if="formError" class="alert alert-danger d-flex align-items-center p-2 small" role="alert">
+    <div v-if="formError" class="alert alert-danger d-flex align-items-center p-2 small" role="alert" aria-live="assertive">
       <AlertCircle class="me-2 flex-shrink-0" :size="18" />
       <div>{{ formError }}</div>
     </div>
@@ -92,6 +93,7 @@ defineExpose({
         id="session-form-date"
         type="date"
         v-model="formData.session_date"
+        name="session_date"
         required
         class="form-control form-control-sm"
         :disabled="saving"
@@ -103,6 +105,7 @@ defineExpose({
       <input
         id="session-form-topic"
         v-model="formData.topic"
+        name="topic"
         type="text"
         placeholder="e.g., Genesis Chapter 1"
         class="form-control form-control-sm"
@@ -110,9 +113,9 @@ defineExpose({
       >
     </div>
 
-    </form>
+  </form>
 </template>
-
+// ...existing code...
 <style scoped>
 /* Add component-specific styles if necessary */
 .form-label {

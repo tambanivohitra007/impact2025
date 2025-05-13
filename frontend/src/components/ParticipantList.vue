@@ -1,10 +1,8 @@
 <script setup>
 import { ref, computed } from 'vue';
-import { Users, Edit, Trash2, Search } from 'lucide-vue-next'; // Import necessary icons
+import { Users, Edit, Trash2, Search, MapPin, Phone, UserCircle, CalendarDays, UsersRound, PlusCircle } from 'lucide-vue-next';
 
 // --- Props ---
-// participants: The array of participant objects passed from the parent (App.vue)
-// loading: Boolean indicating if the participant data is currently being fetched
 const props = defineProps({
   participants: {
     type: Array,
@@ -18,173 +16,260 @@ const props = defineProps({
 });
 
 // --- Emits ---
-// edit-participant: Emits the participant object when the edit button is clicked
-// delete-participant: Emits the participant ID when the delete button is clicked
-const emit = defineEmits(['edit-participant', 'delete-participant']);
+const emit = defineEmits([
+    'edit-participant',
+    'delete-participant',
+    'add-new-participant' // New event for the add button
+]);
 
 // --- State ---
-// Ref to store the user's search input
-const searchQuery = ref('');
+const searchTerm = ref('');
 
 // --- Computed Properties ---
-// Filters the participants array based on the searchQuery
 const filteredParticipants = computed(() => {
-  if (!searchQuery.value) {
-    return props.participants; // Return all if search is empty
+  if (!searchTerm.value) {
+    return props.participants;
   }
-  const query = searchQuery.value.toLowerCase();
+  const lowerSearch = searchTerm.value.toLowerCase();
   return props.participants.filter(p =>
-    p.name.toLowerCase().includes(query) ||
-    p.id.toString().includes(query) ||
-    (p.referrer_name && p.referrer_name.toLowerCase().includes(query)) ||
-    (p.referred_by_participant_id && p.referred_by_participant_id.toString().includes(query))
+    p.name.toLowerCase().includes(lowerSearch) ||
+    (p.contact_info && p.contact_info.toLowerCase().includes(lowerSearch)) ||
+    (p.locality && p.locality.toLowerCase().includes(lowerSearch)) ||
+    (p.main_address && p.main_address.toLowerCase().includes(lowerSearch))
   );
 });
 
 // --- Helper Functions ---
-// Formats date string to a readable format (e.g., YYYY-MM-DD)
 const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     try {
         const date = new Date(dateString);
-        // Adjust for timezone offset to display the correct local date
         const offset = date.getTimezoneOffset() * 60000;
         const adjustedDate = new Date(date.getTime() + offset);
-        return adjustedDate.toLocaleDateString('en-CA'); // Or 'en-US', etc.
+        return adjustedDate.toLocaleDateString('en-CA');
     } catch (e) {
         console.error("Error formatting date:", dateString, e);
         return 'Invalid Date';
     }
 };
 
-// Helper function to format gender display
-const formatGender = (gender) => {
-  if (!gender) return 'N/A';
-  return gender === 'M' ? 'Masculin' : gender === 'F' ? 'Féminin' : 'N/A';
+const formatGender = (genderCode) => {
+    if (genderCode === 'M') return 'Male';
+    if (genderCode === 'F') return 'Female';
+    return 'N/A';
 };
 
 // --- Methods ---
-// Emits the 'edit-participant' event with the participant object
 const handleEditClick = (participant) => {
   emit('edit-participant', participant);
 };
 
-// Emits the 'delete-participant' event with the participant ID
 const handleDeleteClick = (participantId) => {
-  // Optional: Add a confirmation dialog here if preferred within the component
-  // if (confirm('Are you sure you want to delete this participant?')) {
-       emit('delete-participant', participantId);
-  // }
+  emit('delete-participant', participantId);
+};
+
+const handleAddNewParticipantClick = () => {
+  emit('add-new-participant'); // Emit event to be caught by App.vue
 };
 
 </script>
 
 <template>
-  <div class="card shadow-sm">
-    <div class="card-header bg-light p-3">
+  <div class="card w-100 shadow-sm mb-4 h-100 d-flex flex-column">
+    <div class="card-header bg-light p-3 flex-shrink-0">
       <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center">
-        <div>
-          <h5 class="card-title mb-1 d-flex align-items-center">
-            <Users class="me-2" :size="20" /> Participants ({{ filteredParticipants.length }})
-          </h5>
-           <!-- <p class="card-subtitle text-muted small d-none d-sm-block">View, edit, or remove participants.</p> -->
-        </div>
-        <div class="input-group mt-2 mt-sm-0" style="max-width: 300px;">
-          <span class="input-group-text"><Search :size="16"/></span>
-          <input
-            type="text"
-            class="form-control form-control-sm"
-            placeholder="Rechercher par nom ou ID..."
-            v-model="searchQuery"
-            @input="filterParticipants"
-          >
+        <h2 class="h5 mb-2 mb-sm-0 text-primary d-flex align-items-center">
+          <Users class="me-2" :size="22" /> Participant List
+          <span class="badge bg-secondary ms-2">{{ filteredParticipants.length }}</span>
+        </h2>
+        <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-2">
+            <div class="input-group input-group-sm" style="max-width: 220px;">
+              <span class="input-group-text bg-white border-end-0"><Search :size="16"/></span>
+              <input
+                type="search"
+                class="form-control border-start-0"
+                placeholder="Search..."
+                v-model="searchTerm"
+                aria-label="Search participants"
+              >
+            </div>
+            <button @click="handleAddNewParticipantClick" class="btn btn-primary btn-sm d-flex align-items-center ms-sm-2">
+                <PlusCircle class="me-1" :size="16" /> Add
+            </button>
         </div>
       </div>
     </div>
 
-    <div class="card-body p-0">
-      <div v-if="loading" class="text-center p-4 text-muted">
-        <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
-        <span class="ms-2">Chargement des participants...</span>
+    <div class="card-body p-0 flex-grow-1" style="overflow-y: auto;">
+      <div v-if="loading" class="text-center p-5 text-muted d-flex flex-column justify-content-center align-items-center h-100">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2 mb-0">Loading participants...</p>
       </div>
 
-      <div v-else class="table-responsive">
-        <table class="table table-hover mb-0">
-          <thead>
-            <tr>
-              <th scope="col">ID</th>
-              <th scope="col">Nom</th>
-              <th scope="col">Contact</th>
-              <th scope="col">Âge</th>
-              <th scope="col">Genre</th>
-              <th scope="col">Adresse</th>
-              <th scope="col">Quartier</th>
-              <th scope="col">Date</th>
-              <th scope="col">Recommandé par</th>
-              <th scope="col" class="text-end">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="!loading && filteredParticipants.length === 0">
-              <td colspan="10" class="text-center text-muted py-4">
-                {{ searchQuery ? 'Aucun participant trouvé.' : 'Aucun participant ajouté.' }}
-              </td>
-            </tr>
-            <tr v-for="p in filteredParticipants" :key="p.id">
-              <td>{{ p.id }}</td>
-              <td>{{ p.name }}</td>
-              <td>{{ p.contact_info || 'N/A' }}</td>
-              <td>{{ p.age || 'N/A' }}</td>
-              <td>{{ formatGender(p.gender) }}</td>
-              <td>{{ p.main_address || 'N/A' }}</td>
-              <td>{{ p.locality || 'N/A' }}</td>
-              <td>{{ formatDate(p.date_joined) }}</td>
-              <td>{{ p.referrer_name ? `${p.referrer_name} (ID: ${p.referred_by_participant_id})` : '--' }}</td>
-              <td>
-                <button
-                  @click="handleEditClick(p)"
-                  title="Modifier le participant"
-                  class="btn btn-sm btn-outline-secondary me-1 px-1 py-0"
-                >
-                  <Edit :size="16" />
-                </button>
-                <button
-                  @click="handleDeleteClick(p.id)"
-                  title="Supprimer le participant"
-                  class="btn btn-sm btn-outline-danger px-1 py-0"
-                >
-                  <Trash2 :size="16" />
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div v-else-if="!filteredParticipants.length" class="text-center p-5 text-muted d-flex flex-column justify-content-center align-items-center h-100">
+        <UsersRound :size="48" class="mb-2" />
+        <p class="mb-1 fw-bold">
+            {{ searchTerm ? 'No participants found.' : 'No participants yet.' }}
+        </p>
+        <p class="small">
+            {{ searchTerm ? 'Try a different search term.' : 'Click "Add Participant" to get started.' }}
+        </p>
+      </div>
+
+      <div v-else>
+        <div class="table-responsive d-none d-md-block">
+          <table class="table table-hover table-bordered mb-0">
+            <thead class="table-light sticky-top" style="z-index: 1;">
+              <tr>
+                <th scope="col" class="px-3">Name</th>
+                <th scope="col" class="px-3">Contact</th>
+                <th scope="col" class="px-3">Locality</th>
+                <th scope="col" class="px-3">Joined</th>
+                <th scope="col" class="text-end px-3">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="p in filteredParticipants" :key="p.id">
+                <td class="align-middle px-3">
+                  <div class="fw-medium">{{ p.name }}</div>
+                  <div class="small text-muted">
+                    {{ p.age ? `${p.age} yrs` : '' }}{{ p.age && p.gender ? ', ' : '' }}{{ p.gender ? formatGender(p.gender) : '' }}
+                  </div>
+                </td>
+                <td class="align-middle small px-3">{{ p.contact_info || 'N/A' }}</td>
+                <td class="align-middle small px-3">{{ p.locality || 'N/A' }}</td>
+                <td class="align-middle small px-3">{{ formatDate(p.date_joined) }}</td>
+                <td class="text-end align-middle px-3">
+                  <button @click="handleEditClick(p)" title="Edit Participant" class="btn btn-sm btn-outline-secondary me-1 px-2 py-1 lh-1">
+                    <Edit :size="16" />
+                  </button>
+                  <button @click="handleDeleteClick(p.id)" title="Delete Participant" class="btn btn-sm btn-outline-danger px-2 py-1 lh-1">
+                    <Trash2 :size="16" />
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="list-group list-group-flush d-md-none">
+          <div v-for="p in filteredParticipants" :key="p.id" class="list-group-item px-3 py-2">
+            <div class="d-flex w-100 justify-content-between align-items-start">
+              <div>
+                <h6 class="mb-1 fw-bold">{{ p.name }}</h6>
+                <small class="text-muted d-block">
+                  <UserCircle :size="14" class="me-1 align-text-bottom" />
+                  {{ p.age ? `${p.age} yrs` : 'Age N/A' }}, {{ p.gender ? formatGender(p.gender) : 'Gender N/A' }}
+                </small>
+                 <small v-if="p.contact_info" class="text-muted d-block">
+                  <Phone :size="14" class="me-1 align-text-bottom" /> {{ p.contact_info }}
+                </small>
+              </div>
+              <div class="btn-group ms-2 flex-shrink-0">
+                  <button @click="handleEditClick(p)" title="Edit Participant" class="btn btn-sm btn-outline-secondary px-2 py-1 lh-1">
+                    <Edit :size="16" />
+                  </button>
+                  <button @click="handleDeleteClick(p.id)" title="Delete Participant" class="btn btn-sm btn-outline-danger px-2 py-1 lh-1">
+                    <Trash2 :size="16" />
+                  </button>
+              </div>
+            </div>
+            <div class="mt-1">
+              <small v-if="p.main_address" class="d-block text-muted">
+                <MapPin :size="14" class="me-1 align-text-bottom" /> {{ p.main_address }}{{ p.locality ? `, ${p.locality}` : '' }}
+              </small>
+               <small v-else-if="p.locality" class="d-block text-muted">
+                <MapPin :size="14" class="me-1 align-text-bottom" /> {{ p.locality }}
+              </small>
+              <small class="d-block text-muted">
+                <CalendarDays :size="14" class="me-1 align-text-bottom" /> Joined: {{ formatDate(p.date_joined) }}
+              </small>
+              <small v-if="p.referrer_name" class="d-block text-muted">
+                <UsersRound :size="14" class="me-1 align-text-bottom" /> Referred by: {{ p.referrer_name }}
+              </small>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
-    </div>
+  </div>
 </template>
 
 <style scoped>
-/* Scoped styles for ParticipantList component */
-.table th {
-    /* Example: Make table headers slightly bolder */
-    font-weight: 500;
-    white-space: nowrap; /* Prevent header text wrapping */
+/* Ensure card takes full height if it's a flex item in parent */
+.card.d-flex.flex-column {
+    /* Height is managed by parent flex container */
+    
 }
-.table td {
-    /* Example: Vertically align table cell content */
+.card-body {
+    /* If the list inside is too long, this allows the body to scroll */
+}
+.table-responsive {
+    /* Max height can be set here if needed, or rely on card-body overflow */
+}
+.table thead th {
     vertical-align: middle;
+    padding-top: 0.65rem;
+    padding-bottom: 0.65rem;
+    padding-left: var(--bs-gutter-x, 0.75rem);
+    padding-right: var(--bs-gutter-x, 0.75rem);
+    font-weight: 500;
+    white-space: nowrap;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.table tbody td {
+    vertical-align: middle;
+    padding-top: 0.65rem;
+    padding-bottom: 0.65rem;
+    padding-left: var(--bs-gutter-x, 0.75rem);
+    padding-right: var(--bs-gutter-x, 0.75rem);
+}
+.table td .small {
+    font-size: 0.8rem;
+}
+
+.list-group-item {
+    padding-left: var(--bs-gutter-x, 0.75rem);
+    padding-right: var(--bs-gutter-x, 0.75rem);
+    border-bottom: 1px solid rgba(0,0,0,.08);
+}
+.list-group-item:last-child {
+    border-bottom: 0;
+}
+.list-group-item h6 {
+    color: var(--bs-primary);
+}
+.list-group-item small svg {
+    vertical-align: -2px;
+}
+
+.btn-sm.lh-1 {
+    line-height: 1;
 }
 .input-group-text {
-    background-color: #e9ecef; /* Match default Bootstrap input group style */
+    background-color: #fff;
     border-right: 0;
 }
-.form-control {
-    border-left: 0; /* Remove double border next to icon */
+.form-control.border-start-0 {
+    border-left: 0;
 }
 .form-control:focus {
-     border-color: #dee2e6; /* Prevent border color change on focus */
-     box-shadow: none; /* Remove focus shadow */
-     border-left: 0;
+     border-color: #86b7fe;
+     box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+.form-control.border-start-0:focus {
+    border-left:0;
+}
+.badge.bg-secondary {
+    font-size: 0.7em;
+    padding: 0.3em 0.5em;
+    vertical-align: middle;
+}
+.card-header h2.h5 { /* Ensure title doesn't have too much margin if it's the only thing */
+    margin-bottom: 0 !important;
 }
 </style>

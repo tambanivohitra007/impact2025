@@ -1,6 +1,6 @@
 <script setup>
 import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue';
-import bootstrap from 'bootstrap/dist/js/bootstrap.bundle.min.js'; // Needed for modal JS control
+import bootstrap from 'bootstrap/dist/js/bootstrap.bundle.min.js';
 
 // Import Child Components
 import BaseModal from './components/BaseModal.vue';
@@ -9,52 +9,43 @@ import ParticipantList from './components/ParticipantList.vue';
 import SessionForm from './components/SessionForm.vue';
 import SessionList from './components/SessionList.vue';
 import AttendanceTracker from './components/AttendanceTracker.vue';
-import Dashboard from './components/Dashboard.vue';
-import Admin from './components/Admin.vue';
+import DashboardView from './components/DashboardView.vue';
+// import AdminView from './components/AdminView.vue'; // Assuming you might create this
 
 // Import Icons
-import { BookOpen, Users, Calendar, AlertCircle, XCircle, Save, PlusCircle, UserCheck, BarChart2 } from 'lucide-vue-next';
+import { BookOpen, Users, Calendar, AlertCircle, Save, PlusCircle, UserCheck, BarChart2, Settings, LogOut, ChevronDown, Menu, List, ChurchIcon } from 'lucide-vue-next'; // Changed ChevronDown to Menu for mobile toggle
+import Admin from './components/Admin.vue';
 
 // --- Configuration ---
-const API_BASE_URL = 'http://localhost:3001/api'; // Backend API URL
+const API_BASE_URL = 'http://localhost:3001/api';
 
 // --- State ---
-const view = ref('dashboard'); // Current view: 'dashboard', 'participants', 'sessions', 'attendance', 'admin'
-const participants = ref([]);    // Array of all participants
-const sessions = ref([]);        // Array of all sessions
-const selectedSession = ref(null); // The session object currently being viewed/edited for attendance
-const currentAttendance = ref([]); // Attendance records for the selectedSession
+const view = ref('dashboard');
+const participants = ref([]);
+const sessions = ref([]);
+const selectedSession = ref(null);
+const currentAttendance = ref([]);
 
-// Loading States
 const loading = reactive({
   participants: false,
   sessions: false,
   attendance: false,
-  app: true, // Initial app load
+  app: true,
 });
-// Saving State (used for disabling buttons during API calls)
 const saving = ref(false);
-// Global Error Message
 const error = ref(null);
-
-// Success notification state
-const successNotification = ref({
-  show: false,
-  message: '',
-  participantId: null
-});
+const successNotification = ref({ show: false, message: '', details: '' });
+const isMobileNavOpen = ref(false);
 
 // --- Modal State & Refs ---
-// Participant Modal
 const showParticipantModal = ref(false);
 const editingParticipant = ref(null);
 const participantFormRef = ref(null);
 
-// Session Modal
 const showSessionModal = ref(false);
 const sessionFormRef = ref(null);
 
-// --- API Call Function ---
+// --- API Call Function (remains the same) ---
 async function apiCall(url, method = 'GET', body = null) {
     const options = {
         method,
@@ -63,26 +54,20 @@ async function apiCall(url, method = 'GET', body = null) {
     if (body) {
         options.body = JSON.stringify(body);
     }
-
     if (method !== 'GET') saving.value = true;
-
     let errorMessage = null;
-
     try {
         const response = await fetch(`${API_BASE_URL}${url}`, options);
         const data = await response.json();
         if (!response.ok) {
-            console.error(`API Error (${response.status}) ${method} ${url}: ${data?.error || response.statusText}`, data?.details);
             errorMessage = `Error: ${data?.error || response.statusText}.`;
+            if (data?.details) errorMessage += ` Details: ${data.details}`;
             throw new Error(errorMessage);
         }
         error.value = null;
         return data;
     } catch (err) {
-        console.error(`API Call failed: ${method} ${url}`, err);
-        if (!errorMessage) {
-            errorMessage = `Network error or failed to fetch. Is the backend running?`;
-        }
+        if (!errorMessage) errorMessage = `Network error. Is backend running?`;
         error.value = errorMessage;
         throw err;
     } finally {
@@ -90,46 +75,32 @@ async function apiCall(url, method = 'GET', body = null) {
     }
 }
 
-// --- Data Fetching Functions ---
+// --- Data Fetching (remains the same) ---
 const fetchParticipants = async () => {
-    loading.participants = true;
-    error.value = null;
-    try {
-        participants.value = await apiCall('/participants');
-    } catch (err) { /* Handled by apiCall */ }
+    loading.participants = true; error.value = null;
+    try { participants.value = await apiCall('/participants'); }
+    catch (err) { /* Handled */ }
     finally { loading.participants = false; }
 };
-
 const fetchSessions = async () => {
-    loading.sessions = true;
-    error.value = null;
-    try {
-        sessions.value = await apiCall('/sessions');
-    } catch (err) { /* Handled by apiCall */ }
+    loading.sessions = true; error.value = null;
+    try { sessions.value = await apiCall('/sessions'); }
+    catch (err) { /* Handled */ }
     finally { loading.sessions = false; }
 };
-
 const fetchInitialData = async () => {
-    loading.app = true;
-    error.value = null;
-    try {
-        await Promise.all([fetchParticipants(), fetchSessions()]);
-    } catch (err) { /* Handled by apiCall */ }
+    loading.app = true; error.value = null;
+    try { await Promise.all([fetchParticipants(), fetchSessions()]); }
+    catch (err) { /* Handled */ }
     finally { loading.app = false; }
 };
-
 const fetchAttendanceForSession = async (sessionId) => {
     if (!sessionId) return;
-    loading.attendance = true;
-    error.value = null;
-    currentAttendance.value = [];
+    loading.attendance = true; error.value = null; currentAttendance.value = [];
     try {
-        const data = await apiCall(`/attendance/${sessionId}`);
-        const attendanceMap = data.reduce((acc, record) => {
-            acc[record.participant_id] = {
-                attended: !!record.attended,
-                notes: record.notes || '',
-            };
+        const rawAttendance = await apiCall(`/attendance/${sessionId}`);
+        const attendanceMap = rawAttendance.reduce((acc, record) => {
+            acc[record.participant_id] = { attended: !!record.attended, notes: record.notes || '' };
             return acc;
         }, {});
         currentAttendance.value = participants.value.map(p => ({
@@ -138,20 +109,31 @@ const fetchAttendanceForSession = async (sessionId) => {
             attended: attendanceMap[p.id]?.attended || false,
             notes: attendanceMap[p.id]?.notes || '',
         }));
-    } catch (err) { /* Handled by apiCall */ }
+    } catch (err) { /* Handled */ }
     finally { loading.attendance = false; }
 };
-
-// --- Lifecycle Hooks ---
 onMounted(fetchInitialData);
 
-// --- Event Handlers for Participant Actions ---
-const handleAddParticipant = () => {
+// --- Navigation (remains the same) ---
+const handleNavigation = (newView) => {
+  view.value = newView;
+  isMobileNavOpen.value = false;
+  if (newView === 'sessions' || newView === 'dashboard') {
+    selectedSession.value = null;
+    currentAttendance.value = [];
+  }
+  nextTick(() => {
+    const mainContent = document.getElementById('mainContentArea');
+    if (mainContent) mainContent.scrollTop = 0;
+  });
+};
+
+// --- Participant Actions ---
+const handleAddParticipantRequest = () => {
     editingParticipant.value = null;
     showParticipantModal.value = true;
 };
-
-const handleEditParticipant = (participant) => {
+const handleEditParticipantRequest = (participant) => {
     editingParticipant.value = participant;
     showParticipantModal.value = true;
 };
@@ -159,44 +141,34 @@ const handleEditParticipant = (participant) => {
 const handleSaveParticipant = async (participantData) => {
     let apiError = null;
     try {
-        let response;
+        let savedParticipant;
         if (editingParticipant.value?.id) {
-            response = await apiCall(`/participants/${editingParticipant.value.id}`, 'PUT', participantData);
-            successNotification.value = {
-                show: true,
-                message: 'Participant modifié avec succès',
-                participantId: editingParticipant.value.id
-            };
+            savedParticipant = await apiCall(`/participants/${editingParticipant.value.id}`, 'PUT', participantData);
+             successNotification.value = { show: true, message: `Participant "${participantData.name}" updated.`, details: '' };
         } else {
-            response = await apiCall('/participants', 'POST', participantData);
-            successNotification.value = {
-                show: true,
-                message: `Participant créé avec succès (ID: ${response.id})`,
-                participantId: response.id
-            };
+            savedParticipant = await apiCall('/participants', 'POST', participantData);
+            successNotification.value = { show: true, message: `Participant "${savedParticipant.name}" created.`, details: `ID: ${savedParticipant.id}` };
         }
-        showParticipantModal.value = false;
-        await fetchParticipants();
-    } catch (err) {
-        apiError = error.value;
-    }
+        showParticipantModal.value = false; await fetchParticipants();
+    } catch (err) { apiError = error.value; }
+    finally { setTimeout(() => successNotification.value.show = false, 4000); }
     return apiError;
 };
-
 const handleDeleteParticipant = async (participantId) => {
-    if (window.confirm("Are you sure you want to delete this participant? This might affect attendance records and referrals.")) {
+    const pToDelete = participants.value.find(p => p.id === participantId);
+    if (window.confirm(`Delete "${pToDelete?.name || 'this participant'}"?`)) {
         try {
             await apiCall(`/participants/${participantId}`, 'DELETE');
+            successNotification.value = { show: true, message: `Participant "${pToDelete?.name || 'ID: '+participantId}" deleted.`, details: '' };
             await fetchParticipants();
-            if (view.value === 'attendance' && selectedSession.value) {
-                await fetchAttendanceForSession(selectedSession.value.id);
-            }
-        } catch (err) { /* Handled by apiCall */ }
+            if (view.value === 'attendance' && selectedSession.value) await fetchAttendanceForSession(selectedSession.value.id);
+        } catch (err) { /* Handled */ }
+        finally { setTimeout(() => successNotification.value.show = false, 4000); }
     }
 };
 
-// --- Event Handlers for Session Actions ---
-const handleAddSession = () => {
+// --- Session Actions ---
+const handleAddSessionRequest = () => {
     showSessionModal.value = true;
 };
 
@@ -204,39 +176,32 @@ const handleSaveSession = async (sessionData) => {
     let apiError = null;
     try {
         await apiCall('/sessions', 'POST', sessionData);
-        showSessionModal.value = false;
-        await fetchSessions();
-    } catch (err) {
-        apiError = error.value;
-    }
+        successNotification.value = { show: true, message: `Session for ${formatDateForDisplay(sessionData.session_date)} added.`, details: '' };
+        showSessionModal.value = false; await fetchSessions();
+    } catch (err) { apiError = error.value; }
+    finally { setTimeout(() => successNotification.value.show = false, 4000); }
     return apiError;
 };
-
 const handleDeleteSession = async (sessionId) => {
-    if (window.confirm(`Are you sure you want to delete this session and all its attendance records?`)) {
+    const sToDelete = sessions.value.find(s => s.id === sessionId);
+    if (window.confirm(`Delete session for ${formatDateForDisplay(sToDelete?.session_date)} and all attendance?`)) {
         try {
             await apiCall(`/sessions/${sessionId}`, 'DELETE');
+            successNotification.value = { show: true, message: `Session for ${formatDateForDisplay(sToDelete?.session_date)} deleted.`, details: '' };
             await fetchSessions();
-            if (view.value === 'attendance' && selectedSession.value?.id === sessionId) {
-                handleBackToSessions();
-            }
-        } catch (err) { /* Handled by apiCall */ }
+            if (view.value === 'attendance' && selectedSession.value?.id === sessionId) handleBackToSessions();
+        } catch (err) { /* Handled */ }
+        finally { setTimeout(() => successNotification.value.show = false, 4000); }
     }
 };
 
-// --- Event Handlers for Attendance Actions ---
+// --- Attendance Actions (remains the same) ---
 const handleViewAttendance = async (session) => {
-    selectedSession.value = session;
-    view.value = 'attendance';
-    await fetchAttendanceForSession(session.id);
+    selectedSession.value = session; view.value = 'attendance'; await fetchAttendanceForSession(session.id);
 };
-
 const handleBackToSessions = () => {
-    selectedSession.value = null;
-    currentAttendance.value = [];
-    view.value = 'sessions';
+    selectedSession.value = null; currentAttendance.value = []; view.value = 'sessions';
 };
-
 const handleSaveAttendance = async (attendanceData) => {
     if (!selectedSession.value) return 'Error: No session selected.';
     let apiError = null;
@@ -250,390 +215,333 @@ const handleSaveAttendance = async (attendanceData) => {
             })
         );
         await Promise.all(promises);
-    } catch (err) {
-        apiError = error.value || 'Failed to save one or more attendance records.';
-    }
+    } catch (err) { apiError = error.value || 'Failed to save one or more attendance records.'; }
     return apiError;
 };
 
-const formattedSelectedSessionDate = computed(() => {
-    if (selectedSession.value?.session_date) {
-        try {
-            const date = new Date(selectedSession.value.session_date);
-            // Adjust for timezone offset to display the date as it was intended
-            const userTimezoneOffset = date.getTimezoneOffset() * 60000;
-            return new Date(date.getTime() + userTimezoneOffset).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
-        } catch (e) {
-            return selectedSession.value.session_date; // fallback
-        }
-    }
-    return '';
-});
-
-// Gestionnaire de navigation
-const handleNavigation = (newView) => {
-    view.value = newView;
-    if (newView === 'sessions') {
-        selectedSession.value = null;
-        currentAttendance.value = [];
-    }
+// --- Computed Properties (remains the same) ---
+const formatDateForDisplay = (dateString) => {
+    if (!dateString) return '';
+    try {
+        const date = new Date(dateString);
+        const userTimezoneOffset = date.getTimezoneOffset() * 60000;
+        return new Date(date.getTime() + userTimezoneOffset).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    } catch (e) { return dateString; }
 };
 
 </script>
 
 <template>
-    <div class="app-wrapper bg-light min-vh-100 d-flex flex-column">
-        <!-- HEADER TOUJOURS VISIBLE -->
-        <header class="py-3 py-md-4 text-center shadow-sm bg-white">
-            <h1 class="h2 mb-1 d-flex align-items-center justify-content-center gap-2 text-primary">
-                <BookOpen :size="30" /> IMPACT 2025
-            </h1>
-            <p class="text-muted small mb-0">Participant & Attendance Tracker</p>
+    <div class="app-wrapper d-flex flex-column bg-body-tertiary min-vh-100">
+        <header class="app-header text-white shadow-sm">
+            <div class="container-fluid d-flex align-items-center justify-content-between py-3 px-3 px-md-4"> 
+                <div class="d-flex align-items-center">
+                    <ChurchIcon :size="30" class="me-2 flex-shrink-0 app-logo-icon" /> 
+                    <h1 class="h5 mb-0 fw-bold d-none d-sm-block app-title">IMPACT 2025</h1>
+                    <h1 class="h5 mb-0 fw-bold d-sm-none app-title-mobile">I25</h1>
+                </div>
+                <button class="btn btn-outline-light d-lg-none p-1 mobile-nav-toggle" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileNavOffcanvas" aria-controls="mobileNavOffcanvas" aria-label="Toggle navigation">
+                    <Menu :size="24" />
+                </button>
+            </div>
         </header>
 
-        <div v-if="error" class="alert alert-danger alert-dismissible fade show container mt-3 mb-0" role="alert">
-             <AlertCircle class="me-2 flex-shrink-0" :size="20" />
-             {{ error }}
-             <button type="button" class="btn-close" @click="error = null" aria-label="Close"></button>
-        </div>
-
-        <div v-if="loading.app" class="flex-grow-1 d-flex flex-column justify-content-center align-items-center text-muted p-5">
-             <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
-                <span class="visually-hidden">Loading...</span>
+        <div v-if="error" class="global-alert alert alert-danger alert-dismissible fade show border-0 rounded-0 m-0 py-2 small" role="alert">
+            <div class="container-fluid d-flex align-items-center">
+                <AlertCircle class="me-2 flex-shrink-0" :size="20" />
+                <strong class="me-1">Error:</strong> {{ error }}
+                <button type="button" class="btn-close btn-sm p-2 ms-auto" @click="error = null" aria-label="Close"></button>
             </div>
-            <p class="mt-3 fs-5">Loading application data...</p>
         </div>
 
-        <div v-else class="container py-3 py-md-4 flex-grow-1">
-            <div class="row">
-                <!-- Navigation latérale -->
-                <div class="col-md-3">
-                    <nav class="sticky-top pt-3">
-                        <h5 class="ps-2 mb-2 text-muted small text-uppercase">Menu</h5>
-                        <div class="list-group list-group-flush">
-                            <a href="#" class="list-group-item list-group-item-action d-flex align-items-center"
-                               :class="{ 'active': view === 'dashboard' }"
-                               @click.prevent="handleNavigation('dashboard')">
-                                <BarChart2 class="me-2 flex-shrink-0" :size="20" /> Dashboard
-                            </a>
-                            <a href="#" class="list-group-item list-group-item-action d-flex align-items-center"
-                               :class="{ 'active': view === 'participants' }"
-                               @click.prevent="handleNavigation('participants')">
-                                <Users class="me-2 flex-shrink-0" :size="20" /> Participants
-                            </a>
-                            <a href="#" class="list-group-item list-group-item-action d-flex align-items-center"
-                               :class="{ 'active': view === 'sessions' || view === 'attendance' }"
-                               @click.prevent="handleNavigation('sessions')">
-                                <Calendar class="me-2 flex-shrink-0" :size="20" /> Sessions &amp; Présence
-                            </a>
-                        </div>
-                    </nav>
-                </div>
-
-                <!-- Contenu principal -->
-                <div class="col-md-9">
-                    <main>
-                        <div v-if="view === 'dashboard'">
-                            <Dashboard @navigate="handleNavigation" />
-                        </div>
-                        <div v-if="view === 'participants'" class="card shadow-sm">
-                            <div class="card-header bg-white py-3">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <h2 class="h5 mb-0 text-primary d-flex align-items-center">
-                                        <Users class="me-2" :size="22" /> Liste des participants
-                                    </h2>
-                                    <button @click="handleAddParticipant" class="btn btn-primary btn-sm">
-                                        <PlusCircle class="me-1" :size="16" /> Ajouter
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <ParticipantList
-                                    :participants="participants"
-                                    :loading="loading.participants"
-                                    @edit-participant="handleEditParticipant"
-                                    @delete-participant="handleDeleteParticipant"
-                                />
-                            </div>
-                        </div>
-
-                        <div v-if="view === 'sessions'" class="card shadow-sm">
-                            <div class="card-header bg-white py-3">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <h2 class="h5 mb-0 text-primary d-flex align-items-center">
-                                        <Calendar class="me-2" :size="22" /> Sessions & Présence
-                                    </h2>
-                                    <button @click="handleAddSession" class="btn btn-primary btn-sm">
-                                        <PlusCircle class="me-1" :size="16" /> Ajouter
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <SessionList
-                                    :sessions="sessions"
-                                    :loading="loading.sessions"
-                                    @view-attendance="handleViewAttendance"
-                                    @delete-session="handleDeleteSession"
-                                />
-                            </div>
-                        </div>
-
-                        <div v-if="view === 'attendance' && selectedSession" class="card shadow-sm">
-                            <div class="card-header bg-white py-3">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <h2 class="h5 mb-0 text-primary d-flex align-items-center">
-                                        <UserCheck class="me-2" :size="22" />
-                                        Présence: {{ selectedSession.topic || formattedSelectedSessionDate }}
-                                    </h2>
-                                    <button class="btn btn-outline-secondary btn-sm" @click="handleBackToSessions">
-                                        &laquo; Retour aux sessions
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <AttendanceTracker
-                                    :session="selectedSession"
-                                    :participants="participants"
-                                    :initial-attendance="currentAttendance"
-                                    :loading="loading.attendance"
-                                    :saving="saving"
-                                    @save-attendance="handleSaveAttendance"
-                                    @delete-session="handleDeleteSession"
-                                />
-                            </div>
-                        </div>
-                         <div v-if="view === 'admin'">
-                            <Admin />
-                        </div>
-                    </main>
+        <div v-if="successNotification.show" class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1100">
+            <div class="toast show align-items-center text-bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                <div class="d-flex">
+                    <div class="toast-body">
+                        {{ successNotification.message }}
+                        <small v-if="successNotification.details" class="d-block opacity-75">{{ successNotification.details }}</small>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" @click="successNotification.show = false" aria-label="Close"></button>
                 </div>
             </div>
         </div>
 
-        <BaseModal
-            v-model:show="showParticipantModal"
-            :title="editingParticipant ? 'Edit Participant' : 'Add New Participant'"
-            @close="editingParticipant = null"
-        >
-             <ParticipantForm
-                ref="participantFormRef"
-                :initialParticipant="editingParticipant"
-                :participants="participants"
-                :saving="saving"
-                @save="handleSaveParticipant"
-                @cancel="showParticipantModal = false"
-             />
+        <div class="app-body container-fluid flex-grow-1 d-flex">
+            <div class="row flex-grow-1 w-100 gx-0">
+                
+                <nav class="col-lg-2 d-none d-lg-block bg-white sidebar shadow-sm">
+                    <div class="sticky-top inner-sidebar-scroll">
+                        <ul class="nav nav-pills flex-column mb-auto px-2">
+                            <li class="nav-item">
+                                <a href="#" class="nav-link d-flex align-items-center" :class="{ 'active': view === 'dashboard' }" @click.prevent="handleNavigation('dashboard')">
+                                    <BarChart2 class="me-2 flex-shrink-0" :size="18" /> Dashboard
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="#" class="nav-link d-flex align-items-center" :class="{ 'active': view === 'participants' }" @click.prevent="handleNavigation('participants')">
+                                    <Users class="me-2 flex-shrink-0" :size="18" /> Participants
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="#" class="nav-link d-flex align-items-center" :class="{ 'active': view === 'sessions' || view === 'attendance' }" @click.prevent="handleNavigation('sessions')">
+                                    <Calendar class="me-2 flex-shrink-0" :size="18" /> Sessions
+                                </a>
+                            </li>
+                              <li class="nav-item">
+                                <a href="#" class="nav-link d-flex align-items-center" :class="{ 'active': view === 'admin'}" @click.prevent="handleNavigation('admin')">
+                                    <Settings class="me-2 flex-shrink-0" :size="18" /> Admin
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </nav>
+
+                
+                <main id="mainContentArea" class="col-12 col-lg-10 main-content-area">
+                    <div v-if="loading.app" class="d-flex justify-content-center align-items-center h-100 text-muted p-5">
+                        <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div>
+                        <p class="ms-3 fs-5">Loading Application...</p>
+                    </div>
+                    <div v-else class="h-100">
+                        <div v-if="view === 'dashboard'" class="view-wrapper px-md-4 py-3 h-100">
+                            <DashboardView @navigate="handleNavigation" class="w-100 h-100" />
+                        </div>
+                        
+                        <div v-if="view === 'participants'" class="view-wrapper px-md-4 py-3 h-100 d-flex flex-column">
+                            <ParticipantList class="flex-grow-1"
+                                :participants="participants"
+                                :loading="loading.participants"
+                                @add-new-participant="handleAddParticipantRequest"
+                                @edit-participant="handleEditParticipantRequest"
+                                @delete-participant="handleDeleteParticipant"
+                            />
+                        </div>
+
+                        <div v-if="view === 'sessions'" class="view-wrapper px-md-4 py-3 h-100 d-flex flex-column">
+                            <SessionList class="flex-grow-1"
+                                :sessions="sessions"
+                                :loading="loading.sessions"
+                                @add-new-session="handleAddSessionRequest"
+                                @view-attendance="handleViewAttendance"
+                                @delete-session="handleDeleteSession"
+                            />
+                        </div>
+
+                        <div v-if="view === 'attendance' && selectedSession" class="view-wrapper px-md-4 py-3 h-100">
+                            <AttendanceTracker 
+                                :session="selectedSession"
+                                :participants="participants"
+                                :initial-attendance="currentAttendance"
+                                :loading="loading.attendance"
+                                :saving="saving"
+                                @back="handleBackToSessions"
+                                @save-attendance="handleSaveAttendance"
+                                @delete-session="handleDeleteSession"
+                            />
+                        </div>
+                        
+                        <div v-if="view === 'admin'" class="view-wrapper px-md-4 py-3 text-center">
+                             <Admin />
+                            </div>
+                    </div>
+                </main>
+            </div>
+        </div>
+
+        <div class="offcanvas offcanvas-start d-lg-none" tabindex="-1" id="mobileNavOffcanvas" aria-labelledby="mobileNavOffcanvasLabel">
+            <div class="offcanvas-header border-bottom">
+                <h5 class="offcanvas-title d-flex align-items-center" id="mobileNavOffcanvasLabel">
+                    <BookOpen :size="24" class="me-2 text-primary" /> Menu
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+            </div>
+            <div class="offcanvas-body">
+                <ul class="nav nav-pills flex-column">
+                    <li class="nav-item">
+                        <a href="#" class="nav-link d-flex align-items-center" :class="{ 'active': view === 'dashboard' }" @click.prevent="handleNavigation('dashboard')" data-bs-dismiss="offcanvas">
+                            <BarChart2 class="me-2 flex-shrink-0" :size="20" /> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link d-flex align-items-center" :class="{ 'active': view === 'participants' }" @click.prevent="handleNavigation('participants')" data-bs-dismiss="offcanvas">
+                            <Users class="me-2 flex-shrink-0" :size="20" /> Participants
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link d-flex align-items-center" :class="{ 'active': view === 'sessions' || view === 'attendance' }" @click.prevent="handleNavigation('sessions')" data-bs-dismiss="offcanvas">
+                            <Calendar class="me-2 flex-shrink-0" :size="20" /> Sessions
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link d-flex align-items-center" :class="{ 'active': view === 'admin' }" @click.prevent="handleNavigation('admin')" data-bs-dismiss="offcanvas">
+                            <Settings class="me-2 flex-shrink-0" :size="20" /> Admin
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+      
+        <BaseModal v-model:show="showParticipantModal" :title="editingParticipant ? 'Edit Participant' : 'Add New Participant'" size="modal-lg" @close="editingParticipant = null">
+             <ParticipantForm ref="participantFormRef" :initialParticipant="editingParticipant" :participants="participants" :saving="saving" @save="handleSaveParticipant" @cancel="showParticipantModal = false"/>
              <template #footer>
                  <button type="button" class="btn btn-outline-secondary btn-sm" @click="showParticipantModal = false" :disabled="saving">Cancel</button>
-                 <button
-                    type="button"
-                    class="btn btn-primary btn-sm"
-                    @click="participantFormRef?.submit()"
-                    :disabled="saving"
-                 >
-                    <span v-if="saving" class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
-                    <Save v-else class="me-1" :size="16" />
+                 <button type="button" class="btn btn-primary btn-sm d-flex align-items-center" @click="participantFormRef?.submit()" :disabled="saving">
+                    <span v-if="saving" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    <Save v-else class="me-2" :size="16" />
                     {{ saving ? (editingParticipant ? 'Saving...' : 'Adding...') : (editingParticipant ? 'Save Changes' : 'Add Participant') }}
                  </button>
              </template>
         </BaseModal>
-
-        <BaseModal
-            v-model:show="showSessionModal"
-            title="Add New Study Session"
-            @close="showSessionModal = false"
-         >
-              <SessionForm
-                ref="sessionFormRef"
-                :saving="saving"
-                @save="handleSaveSession"
-                @cancel="showSessionModal = false"
-              />
+         <BaseModal v-model:show="showSessionModal" title="Add New Study Session" @close="showSessionModal = false">
+              <SessionForm ref="sessionFormRef" :saving="saving" @save="handleSaveSession" @cancel="showSessionModal = false"/>
               <template #footer>
                  <button type="button" class="btn btn-outline-secondary btn-sm" @click="showSessionModal = false" :disabled="saving">Cancel</button>
-                 <button
-                    type="button"
-                    class="btn btn-primary btn-sm"
-                    @click="sessionFormRef?.submit()"
-                    :disabled="saving"
-                 >
-                    <span v-if="saving" class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
-                    <Save v-else class="me-1" :size="16" />
+                 <button type="button" class="btn btn-primary btn-sm d-flex align-items-center" @click="sessionFormRef?.submit()" :disabled="saving">
+                    <span v-if="saving" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    <Save v-else class="me-2" :size="16" />
                     {{ saving ? 'Adding...' : 'Add Session' }}
                  </button>
              </template>
          </BaseModal>
 
-        <!-- Success Notification Modal -->
-        <div v-if="successNotification.show" class="modal fade show" style="display: block; z-index: 9999;" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Succès</h5>
-                        <button type="button" class="btn-close" @click="successNotification.show = false"></button>
-                    </div>
-                    <div class="modal-body">
-                        <p>{{ successNotification.message }}</p>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-primary" @click="successNotification.show = false">OK</button>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-backdrop fade show" style="z-index: 9998;"></div>
-        </div>
-
-        <footer class="mt-auto pt-3 pb-3 text-center text-muted small bg-white border-top">
+        <footer class="app-footer text-center text-muted small py-3 bg-white border-top mt-auto">
             IMPACT2025 - Madagascar &copy; {{ new Date().getFullYear() }}
         </footer>
     </div>
 </template>
 
 <style>
-/* Global styles (consider moving to a separate CSS file imported in main.js or a <style> tag in index.html) */
-body, html {
-    height: 100%;
-    margin: 0;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+html, body {
+  height: 100%;
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background-color: #f0f2f5;
 }
 
-#app { /* Assuming your Vue app is mounted to an element with id="app" in index.html */
-    min-height: 100%;
-    display: flex; /* This helps if #app is the direct child of body for full height flex */
-    flex-direction: column;
+#app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
-.app-wrapper { /* Renamed from .container-fluid for clarity, still acts as the main flex container */
-    /* d-flex flex-column min-vh-100 are applied via class */
+/* --- UPDATED HEADER STYLES --- */
+.app-header {
+    /* background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%); */ /* Primary to darker primary */
+    background: linear-gradient(to right, var(--bs-primary), var(--bs-primary-dark, #0a58ca)); /* Use Bootstrap CSS var if available, else fallback */
+    /* Or try a different gradient: */
+    /* background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); /* Dark blue to lighter blue */
+    padding-top: 0.75rem !important; /* py-3 equivalent */
+    padding-bottom: 0.75rem !important;
+    border-bottom: 1px solid rgba(0,0,0,0.1); /* Subtle border */
 }
+.app-header .app-title, .app-header .app-title-mobile {
+    font-weight: 600; /* Slightly bolder title */
+    letter-spacing: 0.5px;
+}
+.app-header .mobile-nav-toggle {
+    border: 1px solid rgba(255,255,255,0.3);
+    background-color: transparent;
+    transition: background-color 0.2s ease;
+}
+.app-header .mobile-nav-toggle:hover,
+.app-header .mobile-nav-toggle:focus {
+    background-color: rgba(255,255,255,0.1);
+    border-color: rgba(255,255,255,0.7);
+}
+.app-logo-icon {
+    /* Add a subtle animation or effect if desired */
+    /* Example: transform: rotate(-5deg); */
+}
+/* --- END OF UPDATED HEADER STYLES --- */
 
-/* Hide old nav pills if they were still there */
-.nav-pills .nav-link,
-.nav-pills .nav-link:hover,
-.nav-pills .nav-link.active {
-    /* display: none; */ /* Commented out if you are not using .nav-pills anymore */
-}
 
-.card-header {
-    border-bottom: 1px solid #e9ecef; /* Softer border for cards */
-}
-
-/* Ensure modals don't cause horizontal scroll */
-.modal {
-    overflow-x: hidden;
-}
-/* Adjust button focus rings for better visibility */
-.btn:focus, .btn:focus-visible {
-    box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.35);
-}
-.btn-outline-secondary:focus, .btn-outline-secondary:focus-visible {
-     box-shadow: 0 0 0 0.25rem rgba(108, 117, 125, 0.35);
-}
-.btn-danger:focus, .btn-danger:focus-visible,
-.btn-outline-danger:focus, .btn-outline-danger:focus-visible {
-     box-shadow: 0 0 0 0.25rem rgba(var(--bs-danger-rgb), 0.35);
-}
-
-/* Styles pour la modal de notification (if not using BaseModal) */
-/* These styles for .modal, .modal-backdrop, .modal-dialog, .modal-content might be redundant if Bootstrap handles them */
-/*
-.modal {
-    position: fixed;
+.global-alert {
+    z-index: 1056;
+    position: sticky;
     top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+}
+.app-header.sticky-top + .global-alert {
+    top: 62px; /* Adjust based on actual header height (py-3 is approx 1rem top/bottom + font) */
 }
 
-.modal-backdrop {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
+.app-body {
+  /* d-flex flex-grow-1 are on class */
 }
 
-.modal-dialog {
-    position: relative;
-    z-index: 9999;
+.app-body > .row {
+  /* flex-grow-1 w-100 are on class */
 }
 
-.modal-content {
-    position: relative;
-    z-index: 9999;
+.sidebar {
+  background-color: #fff;
 }
-*/
-
-/* Styles pour la navigation latérale modernisée */
-.list-group-item {
-    border-radius: 0.375rem; /* Add some rounding to items */
-    margin-bottom: 0.25rem; /* Add a small gap between items */
-    padding: 0.85rem 1rem; /* Adjust padding */
-    font-weight: 500; /* Slightly bolder text */
-    color: #495057; /* Standard text color */
-    border-left: 3px solid transparent; /* For active indicator */
-    transition: background-color 0.15s ease-in-out, border-left-color 0.15s ease-in-out, color 0.15s ease-in-out;
+.sidebar .inner-sidebar-scroll {
+  height: calc(100vh - 62px - 1rem); /* Approx header height & some padding */
+  overflow-y: auto;
+  padding-top: 0.5rem;
 }
-
-.list-group-item:hover {
-    background-color: #e9ecef; /* Lighter hover background */
-    color: #0d6efd; /* Primary color on hover for text */
-    border-left-color: #cfe2ff; /* Light primary color for border on hover */
-}
-
-.list-group-item.active {
-    background-color: #cfe2ff; /* Light primary background for active */
-    color: #0a58ca; /* Darker primary color for active text */
-    border-left-color: #0d6efd; /* Solid primary color for active indicator */
+.sidebar-heading {
+    font-size: 0.75rem;
     font-weight: 600;
+    letter-spacing: .05em;
+}
+.sidebar .nav-link {
+  font-weight: 500;
+  color: #495057;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.3rem;
+  margin-bottom: 0.125rem;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.sidebar .nav-link .lucide {
+  color: #6c757d;
+  transition: color 0.15s ease;
+  margin-right: 0.65rem !important;
+}
+.sidebar .nav-link:hover {
+  background-color: #eef2f7;
+  color: var(--bs-primary);
+}
+.sidebar .nav-link:hover .lucide {
+  color: var(--bs-primary);
+}
+.sidebar .nav-link.active {
+  background-color: var(--bs-primary);
+  color: white;
+  font-weight: 500;
+}
+.sidebar .nav-link.active .lucide {
+  color: white;
 }
 
-.list-group-item.active .lucide { /* Style icons in active item */
-    color: #0a58ca;
+.main-content-area {
+  overflow-y: scroll;
+  background-color: #f0f2f5;
+}
+.view-wrapper {
+    /* This wrapper inside main-content-area now holds the padding */
+}
+.view-wrapper.d-flex.flex-column > .flex-grow-1 {
+    overflow-y: auto;
+    min-height: 0;
 }
 
-.list-group-item .lucide { /* Default icon color */
-    color: #6c757d; /* Muted icon color */
-    transition: color 0.15s ease-in-out;
-}
 
-.list-group-item:hover .lucide {
-    color: #0d6efd; /* Icon color on hover */
-}
+.offcanvas-start { width: 280px; }
+.offcanvas-body .nav-link { font-size: 1rem; padding: 0.75rem 1rem; }
+.offcanvas-body .nav-link.active { background-color: var(--bs-primary); color: white; }
+.offcanvas-body .nav-link .lucide { margin-right: 0.75rem; }
 
-.list-group.list-group-flush .list-group-item {
-    border-right: 0; /* Remove right border from flush items */
-    border-top: 0; /* Remove top border from flush items */
-    border-bottom: 0; /* Remove bottom border from flush items */
-    /* border-left is handled above for active state */
-}
+.toast-container { z-index: 1100 !important; }
+.toast.show { display: block !important; }
+.app-footer { font-size: 0.8rem; background-color: #fff; }
 
-.list-group.list-group-flush .list-group-item:last-child {
-    margin-bottom: 0; /* No margin for the last item */
-}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: rgba(0,0,0,0.05); }
+::-webkit-scrollbar-thumb { background: #ced4da; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #adb5bd; }
 
-/* Ensure sticky navigation works well */
-.sticky-top {
-    top: 1rem; /* Adjust based on your header or desired spacing */
-    align-self: flex-start; /* Important for sticky positioning in flex containers */
-    height: calc(100vh - 2rem - 70px); /* Adjust 70px based on your header height, and 2rem for top/bottom padding */
-    overflow-y: auto; /* Allow scrolling if menu items exceed height */
-}
-
-/* Webkit scrollbar styling for sticky nav */
-.sticky-top::-webkit-scrollbar {
-    width: 6px;
-}
-.sticky-top::-webkit-scrollbar-track {
-    background: transparent;
-}
-.sticky-top::-webkit-scrollbar-thumb {
-    background: #ced4da;
-    border-radius: 3px;
-}
-.sticky-top::-webkit-scrollbar-thumb:hover {
-    background: #adb5bd;
-}
-
+.sidebar .inner-sidebar-scroll::-webkit-scrollbar-thumb { background: #e0e0e0; }
+.sidebar .inner-sidebar-scroll::-webkit-scrollbar-thumb:hover { background: #c0c0c0; }
 </style>

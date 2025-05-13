@@ -1,26 +1,41 @@
 <template>
-  <div class="app-wrapper bg-light min-vh-100 d-flex flex-column">
-    <header class="py-3 py-md-4 text-center shadow-sm bg-white">
-      <h1 class="h2 mb-1 d-flex align-items-center justify-content-center gap-2 text-primary">
-        <span style="font-size: 2rem;">🔒</span> IMPACT 2025
-      </h1>
-      <p class="text-muted small mb-0">Participant & Attendance Tracker</p>
-    </header>
-    <div class="flex-grow-1"></div>
-    <footer class="mt-auto pt-3 pb-3 text-center text-muted small bg-white border-top">
-      IMPACT2025 - Madagascar &copy; {{ new Date().getFullYear() }}
-    </footer>
+  <div class="card w-100 shadow-sm h-100 d-flex flex-column">
+    <div class="card-header bg-light p-3 flex-shrink-0">
+      <h2 class="h5 mb-0 text-primary d-flex align-items-center">
+        <SettingsIcon class="me-2" :size="22" /> Admin Settings
+      </h2>
+    </div>
+
+    <div class="card-body flex-grow-1 d-flex flex-column justify-content-center align-items-center text-muted p-3" style="overflow-y: auto;">
+      <template v-if="isEmpty">
+        <SettingsIcon :size="48" class="mb-3 opacity-50" />
+        <h4 class="text-muted">Admin Area</h4>
+        <p class="text-muted small">This section is under construction or has no specific content to display </p>
+        </template>
+      <template v-else>
+        <p>Admin features and settings will be displayed here.</p>
+      </template>
+    </div>
   </div>
 </template>
 
 <script setup>
-// Pas de logique spécifique pour cette page
+import { ref } from 'vue';
+import { Settings as SettingsIcon } from 'lucide-vue-next'; // Renamed to avoid conflict
+
+// Example: Replace with actual logic to determine if admin content is present
+// For now, we'll assume it's always showing the placeholder.
+const isEmpty = ref(true);
 </script>
 
 <style scoped>
-.app-wrapper {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
+.card.h-100 {
+  /* Ensures the card itself tries to take full height of its parent (.view-wrapper) */
 }
-</style> 
+.card-body {
+  /* flex-grow-1 and d-flex setup handles content filling and centering */
+}
+.card-header h2.h5 {
+    margin-bottom: 0 !important;
+}
+</style>
