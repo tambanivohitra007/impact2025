@@ -17,7 +17,7 @@ import { BookOpen, Users, Calendar, AlertCircle, Save, PlusCircle, UserCheck, Ba
 import Admin from './components/Admin.vue';
 
 // --- Configuration ---
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL; 
 
 // --- State ---
 const view = ref('dashboard');
