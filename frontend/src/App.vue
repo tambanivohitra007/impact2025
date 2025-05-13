@@ -13,7 +13,7 @@ import DashboardView from './components/DashboardView.vue';
 // import AdminView from './components/AdminView.vue'; // Assuming you might create this
 
 // Import Icons
-import { BookOpen, Users, Calendar, AlertCircle, Save, PlusCircle, UserCheck, BarChart2, Settings, LogOut, ChevronDown, Menu, List, ChurchIcon } from 'lucide-vue-next'; // Changed ChevronDown to Menu for mobile toggle
+import { BookOpen, Users, Calendar, AlertCircle, Save, PlusCircle, UserCheck, BarChart2, Settings, LogOut, ChevronDown, Menu, List, ChurchIcon, ListCheck } from 'lucide-vue-next'; // Changed ChevronDown to Menu for mobile toggle
 import Admin from './components/Admin.vue';
 
 // --- Configuration ---
@@ -236,9 +236,20 @@ const formatDateForDisplay = (dateString) => {
         <header class="app-header text-white shadow-sm">
             <div class="container-fluid d-flex align-items-center justify-content-between py-3 px-3 px-md-4"> 
                 <div class="d-flex align-items-center">
-                    <ChurchIcon :size="30" class="me-2 flex-shrink-0 app-logo-icon" /> 
-                    <h1 class="h5 mb-0 fw-bold d-none d-sm-block app-title">IMPACT 2025</h1>
-                    <h1 class="h5 mb-0 fw-bold d-sm-none app-title-mobile">I25</h1>
+                    <ChurchIcon :size="30" class="me-2 flex-shrink-0 app-logo-icon" />
+                    
+                    <!-- Desktop Title and Subtitle -->
+                    <div class="d-none d-sm-block"> 
+                        <h1 class="h5 mb-0 fw-bold app-title">IMPACT 2025</h1>
+                        <p class="mb-0 small text-white-50" style="line-height: 1.2;">Hoavy indray Jesosy</p>
+                    </div>
+
+                    <!-- Mobile Title -->
+                    <div class="d-sm-none"> 
+                        <h1 class="h5 mb-0 fw-bold app-title-mobile">I25</h1>
+                        <!-- If you want the subtitle on mobile as well, you can add it here: -->
+                        <!-- <p class="mb-0 small text-white-50" style="line-height: 1.2;">Hoavy indray Jesosy</p> -->
+                    </div>
                 </div>
                 <button class="btn btn-outline-light d-lg-none p-1 mobile-nav-toggle" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileNavOffcanvas" aria-controls="mobileNavOffcanvas" aria-label="Toggle navigation">
                     <Menu :size="24" />
@@ -351,7 +362,7 @@ const formatDateForDisplay = (dateString) => {
         <div class="offcanvas offcanvas-start d-lg-none" tabindex="-1" id="mobileNavOffcanvas" aria-labelledby="mobileNavOffcanvasLabel">
             <div class="offcanvas-header border-bottom">
                 <h5 class="offcanvas-title d-flex align-items-center" id="mobileNavOffcanvasLabel">
-                    <BookOpen :size="24" class="me-2 text-primary" /> Menu
+                    <ListCheck  :size="24" class="me-2 text-primary" /> Menu
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
             </div>
@@ -428,7 +439,7 @@ html, body {
 /* --- UPDATED HEADER STYLES --- */
 .app-header {
     /* background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%); */ /* Primary to darker primary */
-    background: linear-gradient(to right, var(--bs-primary), var(--bs-primary-dark, #0a58ca)); /* Use Bootstrap CSS var if available, else fallback */
+    background: linear-gradient(to right, var(--bs-primary), var(--bs-primary-dark, #7472d3)); /* Use Bootstrap CSS var if available, else fallback */
     /* Or try a different gradient: */
     /* background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); /* Dark blue to lighter blue */
     padding-top: 0.75rem !important; /* py-3 equivalent */
@@ -465,13 +476,6 @@ html, body {
     top: 62px; /* Adjust based on actual header height (py-3 is approx 1rem top/bottom + font) */
 }
 
-.app-body {
-  /* d-flex flex-grow-1 are on class */
-}
-
-.app-body > .row {
-  /* flex-grow-1 w-100 are on class */
-}
 
 .sidebar {
   background-color: #fff;
@@ -495,7 +499,7 @@ html, body {
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 .sidebar .nav-link .lucide {
-  color: #6c757d;
+  color: var(--bs-primary);
   transition: color 0.15s ease;
   margin-right: 0.65rem !important;
 }
@@ -507,9 +511,11 @@ html, body {
   color: var(--bs-primary);
 }
 .sidebar .nav-link.active {
-  background-color: var(--bs-primary);
+  background-image: linear-gradient(to right, var(--bs-primary), #24e2d2); /* Example gradient */
   color: white;
   font-weight: 500;
+  border: none; /* Optional: remove border if any default is applied that clashes */
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
 }
 .sidebar .nav-link.active .lucide {
   color: white;

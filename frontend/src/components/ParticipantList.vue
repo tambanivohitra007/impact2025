@@ -80,7 +80,7 @@ const handleAddNewParticipantClick = () => {
       <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center">
         <h2 class="h5 mb-2 mb-sm-0 text-primary d-flex align-items-center">
           <Users class="me-2" :size="22" /> Participant List
-          <span class="badge bg-secondary ms-2">{{ filteredParticipants.length }}</span>
+          <span class="badge bg-danger ms-2">{{ filteredParticipants.length }}</span>
         </h2>
         <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-2">
             <div class="input-group input-group-sm" style="max-width: 220px;">

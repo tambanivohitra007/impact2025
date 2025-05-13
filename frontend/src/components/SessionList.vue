@@ -57,7 +57,7 @@ const handleAddNewSessionClick = () => {
       <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center">
         <h2 class="h5 mb-2 mb-sm-0 text-primary d-flex align-items-center">
           <ListChecks class="me-2" :size="22" /> Session List
-          <span class="badge bg-secondary ms-2">{{ sessions.length }}</span>
+          <span class="badge bg-danger ms-2">{{ sessions.length }}</span>
         </h2>
         <button @click="handleAddNewSessionClick" class="btn btn-primary btn-sm d-flex align-items-center">
             <PlusCircle class="me-1" :size="16" /> Add Session
