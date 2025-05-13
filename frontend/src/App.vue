@@ -25,6 +25,7 @@ const participants = ref([]);
 const sessions = ref([]);
 const selectedSession = ref(null);
 const currentAttendance = ref([]);
+const installPromptEvent = ref(null);
 
 const loading = reactive({
   participants: false,
@@ -246,7 +247,7 @@ const formatDateForDisplay = (dateString) => {
 
                     <!-- Mobile Title -->
                     <div class="d-sm-none"> 
-                        <h1 class="h5 mb-0 fw-bold app-title-mobile">I25</h1>
+                        <h1 class="h5 mb-0 fw-bold app-title-mobile">Impact25</h1>
                         <!-- If you want the subtitle on mobile as well, you can add it here: -->
                         <!-- <p class="mb-0 small text-white-50" style="line-height: 1.2;">Hoavy indray Jesosy</p> -->
                     </div>
