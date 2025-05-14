@@ -17,7 +17,8 @@ import { BookOpen, Users, Calendar, AlertCircle, Save, PlusCircle, UserCheck, Ba
 import Admin from './components/Admin.vue';
 
 // --- Configuration ---
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL; 
+// const API_BASE_URL = import.meta.env.VITE_API_BASE_URL; 
+const API_BASE_URL = 'http://localhost:3001/api'; 
 
 // --- State ---
 const view = ref('dashboard');
@@ -368,7 +369,7 @@ const formatDateForDisplay = (dateString) => {
                 <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
             </div>
             <div class="offcanvas-body">
-                <ul class="nav nav-pills flex-column">
+                <ul class="nav nav-pills flex-column sidebar">
                     <li class="nav-item">
                         <a href="#" class="nav-link d-flex align-items-center" :class="{ 'active': view === 'dashboard' }" @click.prevent="handleNavigation('dashboard')" data-bs-dismiss="offcanvas">
                             <BarChart2 class="me-2 flex-shrink-0" :size="20" /> Dashboard

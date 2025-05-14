@@ -12,6 +12,10 @@ const props = defineProps({
   loading: {
     type: Boolean,
     default: false
+  },
+  itemsPerPage: { // Added prop for items per page
+    type: Number,
+    default: 5 // Default items per page
   }
 });
 
@@ -24,6 +28,7 @@ const emit = defineEmits([
 
 // --- State ---
 const searchTerm = ref('');
+const currentPage = ref(1); // Pagination state
 
 // --- Computed Properties ---
 const filteredParticipants = computed(() => {
@@ -37,6 +42,16 @@ const filteredParticipants = computed(() => {
     (p.locality && p.locality.toLowerCase().includes(lowerSearch)) ||
     (p.main_address && p.main_address.toLowerCase().includes(lowerSearch))
   );
+});
+
+const paginatedParticipants = computed(() => {
+  const start = (currentPage.value - 1) * props.itemsPerPage;
+  const end = start + props.itemsPerPage;
+  return filteredParticipants.value.slice(start, end);
+});
+
+const totalPages = computed(() => {
+  return Math.ceil(filteredParticipants.value.length / props.itemsPerPage);
 });
 
 // --- Helper Functions ---
@@ -72,6 +87,12 @@ const handleAddNewParticipantClick = () => {
   emit('add-new-participant'); // Emit event to be caught by App.vue
 };
 
+const goToPage = (page) => {
+  if (page >= 1 && page <= totalPages.value) {
+    currentPage.value = page;
+  }
+};
+
 </script>
 
 <template>
@@ -82,7 +103,7 @@ const handleAddNewParticipantClick = () => {
           <Users class="me-2" :size="22" /> Participant List
           <span class="badge bg-danger ms-2">{{ filteredParticipants.length }}</span>
         </h2>
-        <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-2">
+        <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-2 mt-3 mt-sm-0">
             <div class="input-group input-group-sm" style="max-width: 220px;">
               <span class="input-group-text bg-white border-end-0"><Search :size="16"/></span>
               <input
@@ -94,7 +115,7 @@ const handleAddNewParticipantClick = () => {
               >
             </div>
             <button @click="handleAddNewParticipantClick" class="btn btn-primary btn-sm d-flex align-items-center ms-sm-2">
-                <PlusCircle class="me-1" :size="16" /> Add
+                <PlusCircle class="me-1" :size="16" /> Add Participant
             </button>
         </div>
       </div>
@@ -131,7 +152,7 @@ const handleAddNewParticipantClick = () => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="p in filteredParticipants" :key="p.id">
+              <tr v-for="p in paginatedParticipants" :key="p.id">
                 <td class="align-middle px-3">
                   <div class="fw-medium">{{ p.name }}</div>
                   <div class="small text-muted">
@@ -155,7 +176,7 @@ const handleAddNewParticipantClick = () => {
         </div>
 
         <div class="list-group list-group-flush d-md-none">
-          <div v-for="p in filteredParticipants" :key="p.id" class="list-group-item px-3 py-2">
+          <div v-for="p in paginatedParticipants" :key="p.id" class="list-group-item px-3 py-2">
             <div class="d-flex w-100 justify-content-between align-items-start">
               <div>
                 <h6 class="mb-1 fw-bold">{{ p.name }}</h6>
@@ -193,6 +214,24 @@ const handleAddNewParticipantClick = () => {
           </div>
         </div>
       </div>
+    </div>
+    <!-- Pagination Controls -->
+    <div v-if="totalPages > 1" class="card-footer d-flex justify-content-between align-items-center">
+      <button
+        @click="goToPage(currentPage - 1)"
+        :disabled="currentPage === 1"
+        class="btn btn-sm btn-outline-secondary"
+      >
+        Previous
+      </button>
+      <span>Page {{ currentPage }} of {{ totalPages }}</span>
+      <button
+        @click="goToPage(currentPage + 1)"
+        :disabled="currentPage === totalPages"
+        class="btn btn-sm btn-outline-secondary"
+      >
+        Next
+      </button>
     </div>
   </div>
 </template>

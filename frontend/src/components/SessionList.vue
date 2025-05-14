@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'; // Import computed if needed, though not strictly used in this version for filtering
+import { ref, computed } from 'vue';
 import { Calendar, UserCheck, Trash2, ListChecks, PlusCircle } from 'lucide-vue-next';
 
 // --- Props ---
@@ -12,6 +12,10 @@ const props = defineProps({
   loading: {
     type: Boolean,
     default: false
+  },
+  itemsPerPage: { // Added prop for items per page
+    type: Number,
+    default: 5 // Default items per page
   }
 });
 
@@ -19,8 +23,22 @@ const props = defineProps({
 const emit = defineEmits([
     'view-attendance',
     'delete-session',
-    'add-new-session' // New event for the add button
+    'add-new-session'
 ]);
+
+// --- Pagination State ---
+const currentPage = ref(1);
+
+// --- Computed Properties ---
+const paginatedSessions = computed(() => {
+  const start = (currentPage.value - 1) * props.itemsPerPage;
+  const end = start + props.itemsPerPage;
+  return props.sessions.slice(start, end);
+});
+
+const totalPages = computed(() => {
+  return Math.ceil(props.sessions.length / props.itemsPerPage);
+});
 
 // --- Helper Functions ---
 const formatDate = (dateString) => {
@@ -46,7 +64,13 @@ const handleDeleteSessionClick = (sessionId) => {
 };
 
 const handleAddNewSessionClick = () => {
-  emit('add-new-session'); // Emit event to be caught by App.vue
+  emit('add-new-session');
+};
+
+const goToPage = (page) => {
+  if (page >= 1 && page <= totalPages.value) {
+    currentPage.value = page;
+  }
 };
 
 </script>
@@ -59,7 +83,7 @@ const handleAddNewSessionClick = () => {
           <ListChecks class="me-2" :size="22" /> Session List
           <span class="badge bg-danger ms-2">{{ sessions.length }}</span>
         </h2>
-        <button @click="handleAddNewSessionClick" class="btn btn-primary btn-sm d-flex align-items-center">
+        <button @click="handleAddNewSessionClick" class="btn btn-primary btn-sm d-flex align-items-center mt-2">
             <PlusCircle class="me-1" :size="16" /> Add Session
         </button>
       </div>      
@@ -81,7 +105,7 @@ const handleAddNewSessionClick = () => {
 
       <div v-else class="list-group list-group-flush">
         <div
-          v-for="s in sessions"
+          v-for="s in paginatedSessions"
           :key="s.id"
           class="list-group-item list-group-item-action py-2"
           >
@@ -117,6 +141,25 @@ const handleAddNewSessionClick = () => {
         </div>
       </div>
     </div>
+
+    <!-- Pagination Controls -->
+    <div v-if="totalPages > 1" class="card-footer d-flex justify-content-between align-items-center">
+      <button
+        @click="goToPage(currentPage - 1)"
+        :disabled="currentPage === 1"
+        class="btn btn-sm btn-outline-secondary"
+      >
+        Previous
+      </button>
+      <span>Page {{ currentPage }} of {{ totalPages }}</span>
+      <button
+        @click="goToPage(currentPage + 1)"
+        :disabled="currentPage === totalPages"
+        class="btn btn-sm btn-outline-secondary"
+      >
+        Next
+      </button>
+    </div>
   </div>
 </template>
 
@@ -128,6 +171,11 @@ const handleAddNewSessionClick = () => {
 .card-body {
     /* If the list inside is too long, this allows the body to scroll */
 }
+
+.card {
+  padding: 1em;
+}
+
 
 .list-group-item {
     padding-left: var(--bs-gutter-x, 0.75rem);
