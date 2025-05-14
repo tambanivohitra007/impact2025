@@ -10,6 +10,7 @@ import SessionForm from './components/SessionForm.vue';
 import SessionList from './components/SessionList.vue';
 import AttendanceTracker from './components/AttendanceTracker.vue';
 import DashboardView from './components/DashboardView.vue';
+import logo from './assets/mahabo.png'; // Assuming you have a logo image
 // import AdminView from './components/AdminView.vue'; // Assuming you might create this
 
 // Import Icons
@@ -17,8 +18,8 @@ import { BookOpen, Users, Calendar, AlertCircle, Save, PlusCircle, UserCheck, Ba
 import Admin from './components/Admin.vue';
 
 // --- Configuration ---
-// const API_BASE_URL = import.meta.env.VITE_API_BASE_URL; 
-const API_BASE_URL = 'http://localhost:3001/api'; 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL; 
+// const API_BASE_URL = 'http://localhost:3001/api'; 
 
 // --- State ---
 const view = ref('dashboard');
@@ -238,8 +239,8 @@ const formatDateForDisplay = (dateString) => {
         <header class="app-header text-white shadow-sm">
             <div class="container-fluid d-flex align-items-center justify-content-between py-3 px-3 px-md-4"> 
                 <div class="d-flex align-items-center">
-                    <ChurchIcon :size="30" class="me-2 flex-shrink-0 app-logo-icon" />
-                    
+                    <!-- <ChurchIcon :size="30" class="me-2 flex-shrink-0 app-logo-icon" /> -->
+                    <img :src="logo" alt="Logo" class="me-2 flex-shrink-0 app-logo-icon" style="width: 50px; height: 50px;" />
                     <!-- Desktop Title and Subtitle -->
                     <div class="d-none d-sm-block"> 
                         <h1 class="h5 mb-0 fw-bold app-title">IMPACT 2025</h1>
