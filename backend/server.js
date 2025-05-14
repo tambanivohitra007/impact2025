@@ -178,6 +178,36 @@ app.get('/api/participants/joining-reasons-stats', (req, res) => {
     });
 });
 
+// GET attendance summary for all participants (how many sessions attended / total)
+app.get('/api/participants/attendance-summary', (req, res) => {
+    const sql = `
+        WITH total_sessions AS (
+            SELECT COUNT(*) AS total FROM study_sessions
+        ),
+        participant_attendance AS (
+            SELECT
+                p.id,
+                p.name,
+                COUNT(a.id) AS attended_sessions
+            FROM participants p
+            LEFT JOIN attendance a ON p.id = a.participant_id AND a.attended = 1
+            GROUP BY p.id
+        )
+        SELECT 
+            pa.id,
+            pa.name,
+            pa.attended_sessions,
+            ts.total
+        FROM participant_attendance pa
+        CROSS JOIN total_sessions ts
+        ORDER BY pa.name COLLATE NOCASE
+    `;
+
+    db.all(sql, [], (err, rows) => {
+        if (handleDatabaseError(err, res, "Error fetching attendance summary")) return;
+        res.json(rows);
+    });
+});
 
 
 // GET a single participant by ID (including referrer name)
@@ -312,7 +342,6 @@ app.delete('/api/sessions/:id', (req, res) => {
         res.json({ message: "Session deleted successfully", id: id, changes: this.changes });
     });
 });
-
 
 // == Attendance ==
 // GET attendance for a specific session, including participant names

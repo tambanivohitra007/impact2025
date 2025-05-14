@@ -54,6 +54,9 @@ const participantFormRef = ref(null);
 const showSessionModal = ref(false);
 const sessionFormRef = ref(null);
 
+const attendanceRef = ref(null);
+
+
 // --- API Call Function ---
 async function apiCall(url, method = 'GET', body = null) {
     const options = {
@@ -89,6 +92,38 @@ async function apiCall(url, method = 'GET', body = null) {
        if(method !== 'GET') saving.value = false;
     }
 }
+
+const confirmIfUnsavedChanges = async (nextView = null) => {
+  if (view.value === 'attendance' && attendanceRef.value?.hasUnsavedChanges) {
+    pendingNavigationTarget.value = nextView;
+    showUnsavedModal.value = true;
+    return false; 
+  }
+  return true; 
+};
+
+
+function discardUnsavedChanges() {
+  showUnsavedModal.value = false;
+  attendanceRef.value.hasUnsavedChanges = false;
+
+  if (pendingNavigationTarget.value === 'sessions') {
+  selectedSession.value = null;
+  currentAttendance.value = [];
+}
+view.value = pendingNavigationTarget.value;
+pendingNavigationTarget.value = null;
+showUnsavedModal.value = false;
+attendanceRef.value.hasUnsavedChanges = false;
+
+}
+
+function cancelUnsavedNavigation() {
+  showUnsavedModal.value = false;
+  pendingNavigationTarget = null;
+}
+
+
 
 // --- Data Fetching Functions ---
 const fetchParticipants = async () => {
@@ -232,10 +267,19 @@ const handleViewAttendance = async (session) => {
 };
 
 const handleBackToSessions = () => {
+  if (attendanceRef.value?.hasUnsavedChanges) {
+    pendingNavigationTarget.value = 'sessions';
+    showUnsavedModal.value = true;
+  } else {
     selectedSession.value = null;
     currentAttendance.value = [];
     view.value = 'sessions';
+  }
 };
+
+
+
+
 
 const handleSaveAttendance = async (attendanceData) => {
     if (!selectedSession.value) return 'Error: No session selected.';
@@ -270,14 +314,21 @@ const formattedSelectedSessionDate = computed(() => {
     return '';
 });
 
-// Gestionnaire de navigation
-const handleNavigation = (newView) => {
-    view.value = newView;
-    if (newView === 'sessions') {
-        selectedSession.value = null;
-        currentAttendance.value = [];
-    }
+const handleNavigation = async (newView) => {
+  const ok = await confirmIfUnsavedChanges(newView);
+  if (!ok) return;
+  view.value = newView;
+  if (newView === 'sessions') {
+    selectedSession.value = null;
+    currentAttendance.value = [];
+  }
 };
+
+
+const showUnsavedModal = ref(false);
+const pendingNavigationTarget = ref(null);
+
+
 
 </script>
 
@@ -406,6 +457,7 @@ const handleNavigation = (newView) => {
                             </div>
                             <div class="card-body">
                                 <AttendanceTracker
+                                    ref="attendanceRef"
                                     :session="selectedSession"
                                     :participants="participants"
                                     :initial-attendance="currentAttendance"
@@ -476,6 +528,17 @@ const handleNavigation = (newView) => {
                  </button>
              </template>
          </BaseModal>
+
+         <BaseModal v-model:show="showUnsavedModal" title="Modifications non enregistrées">
+            <template #default>
+                <p>Vous avez des modifications non enregistrées. Voulez-vous les enregistrer ou les annuler ?</p>
+            </template>
+            <template #footer>
+                <button class="btn btn-outline-secondary btn-sm" @click="discardUnsavedChanges">Quitter sans enregistrer</button>
+                <button class="btn btn-danger btn-sm" @click="cancelUnsavedNavigation">Rester sur la page</button>
+            </template>
+        </BaseModal>
+
 
         <!-- Success Notification Modal -->
         <div v-if="successNotification.show" class="modal fade show" style="display: block; z-index: 9999;" tabindex="-1">

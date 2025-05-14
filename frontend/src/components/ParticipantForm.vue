@@ -59,6 +59,26 @@ const todayDateString = () => new Date().toLocaleDateString('en-CA');
 const showCustomLocality = ref(false);
 const customLocality = ref('');
 
+const referrerName = ref('');
+const referrerNotFound = ref(false);
+
+// Watch le champ ID pour rechercher le nom automatiquement
+watch(() => formData.referred_by_participant_id, (newId) => {
+  if (!newId) {
+    referrerName.value = '';
+    referrerNotFound.value = false;
+    return;
+  }
+
+  const referrer = props.participants.find(p => p.id === Number(newId));
+  if (referrer) {
+    referrerName.value = referrer.name;
+    referrerNotFound.value = false;
+  } else {
+    referrerName.value = '';
+    referrerNotFound.value = true;
+  }
+});
 
 // Function to reset the form fields based on the initialParticipant prop
 const resetForm = (participant) => {
@@ -220,6 +240,8 @@ defineExpose({
         <option value="Andoharanofotsy">Andoharanofotsy</option>
         <option value="Manandona">Manandona</option>
         <option value="Iavoloha">Iavoloha</option>
+        <option value="Iavoloha">Volotara</option>
+        <option value="Iavoloha">Ambohimanambola</option>
         <option value="Autre">Autre</option>
       </select>
     </div>
@@ -249,19 +271,23 @@ defineExpose({
     </div>
 
     <div class="mb-3">
-      <label for="part-form-referrer" class="form-label">Recommandé par</label>
-      <select
+      <label for="part-form-referrer" class="form-label">ID du parrain</label>
+      <input
         id="part-form-referrer"
         v-model="formData.referred_by_participant_id"
-        class="form-select form-select-sm"
+        type="number"
+        class="form-control form-control-sm"
         :disabled="saving"
-      >
-        <option value="">-- Aucun --</option>
-        <option v-for="p in availableReferrers" :key="p.id" :value="p.id">
-          {{ p.id }}
-        </option>
-      </select>
-    </div>  
+        placeholder="Entrer l'ID du parrain"
+      />
+      <small class="text-muted" v-if="referrerName">
+        Recommandé par : <strong>{{ referrerName }}</strong>
+      </small>
+      <small class="text-danger" v-if="referrerNotFound">
+        Aucun participant trouvé avec cet ID
+      </small>
+    </div>
+
 
     <div class="mb-3">
       <label for="joining_reason" class="form-label">Motif d'inscription</label>

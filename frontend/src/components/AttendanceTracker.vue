@@ -13,6 +13,11 @@ const props = defineProps({
     required: true,
     default: () => []
   },
+  sessions: { // session attendance
+    type: Array,
+    required: true,
+    default: () => []
+  },
   initialAttendance: { // Attendance records specifically for this session, passed from parent
     type: Array,
     required: true,
@@ -46,6 +51,11 @@ const showSaveConfirmation = ref(false);
 // State for potential errors specific to this component (e.g., if saving fails)
 const componentError = ref(null);
 
+const attendanceSummaryMap = ref({});
+const totalSessions = ref (0);
+
+const hasUnsavedChanges = ref(false);
+
 // --- Helper Functions ---
 // Formats date string to a readable format (e.g., YYYY-MM-DD)
 const formatDate = (dateString) => {
@@ -57,6 +67,13 @@ const formatDate = (dateString) => {
         return adjustedDate.toLocaleDateString('en-CA');
     } catch (e) { return 'Invalid Date'; }
 };
+
+const isPastSession = computed(() => {
+  if (!props.session?.session_date) return false;
+  const today = new Date().toISOString().split('T')[0];
+  return props.session.session_date < today;
+});
+
 
 // --- Watchers ---
 // Watch the initialAttendance prop passed from the parent.
@@ -81,6 +98,27 @@ const filteredAttendance = computed(() => {
   );
 });
 
+const fetchAttendanceSummary = async () => {
+  try {
+    const response = await fetch('http://localhost:3001/api/participants/attendance-summary');
+    if (!response.ok) throw new Error('Erreur de chargement du résumé de présence');
+
+    const data = await response.json();
+
+    const map = {};
+    data.forEach(entry => {
+      map[entry.id] = entry.attended_sessions;
+    });
+
+    attendanceSummaryMap.value = map;
+    totalSessions.value = data.length > 0 ? data[0].total : 0;
+    console.log(data);
+
+  } catch (err) {
+    console.error("Erreur fetchAttendanceSummary:", err);
+  }
+};
+
 // Calculate attendance counts
 const attendanceCount = computed(() => {
   const attended = localAttendance.value.filter(a => a.attended).length;
@@ -88,19 +126,29 @@ const attendanceCount = computed(() => {
   return { attended, total };
 });
 
+
 // --- Methods ---
 // Handle checkbox change: update the local attendance state
 const handleAttendanceChange = (participantId, isChecked) => {
   const record = localAttendance.value.find(att => att.participant_id === participantId);
   if (record) {
+    if (record.attended !== isChecked) {
+      hasUnsavedChanges.value = true;
+    }
     record.attended = isChecked;
+    hasUnsavedChanges.value = true;
   }
 };
 
 // Emit event to go back to the session list
 const goBack = () => {
+  if (hasUnsavedChanges.value) {
+    const confirmed = window.confirm("Vous avez des modifications non enregistrées. Voulez-vous vraiment quitter sans enregistrer ?");
+    if (!confirmed) return;
+  }
   emit('back');
 };
+
 
 // Emit event to save the current state of localAttendance
 const saveAttendance = async () => {
@@ -110,6 +158,7 @@ const saveAttendance = async () => {
     if (errorMsg) {
         componentError.value = errorMsg; // Show error if parent returns one
     } else {
+        hasUnsavedChanges.value = false;
         showSaveConfirmation.value = true; // Show success confirmation
         setTimeout(() => { showSaveConfirmation.value = false; }, 3000); // Hide after 3s
     }
@@ -135,11 +184,19 @@ const filterParticipants = () => {
     );
 };
 
+
 // Initialize filtered attendance
-onMounted(() => {
-    localAttendance.value = props.initialAttendance;
-    filterParticipants();
+onMounted(async () => {
+  localAttendance.value = props.initialAttendance;
+  filterParticipants();
+  await fetchAttendanceSummary(); // 👈 ajout ici
 });
+
+defineExpose({
+  hasUnsavedChanges,
+  saveAttendance,
+});
+
 
 // Watch for changes in attendance
 watch(() => props.initialAttendance, (newAttendance) => {
@@ -198,6 +255,7 @@ watch(() => props.initialAttendance, (newAttendance) => {
               <th scope="col" class="text-center" style="width: 80px;">Attended</th>
               <th scope="col">ID</th>
               <th scope="col">Nom</th>
+              <th scope="col">Sessions assistées</th>
             </tr>
           </thead>
           <tbody>
@@ -215,12 +273,15 @@ watch(() => props.initialAttendance, (newAttendance) => {
                     :id="'att-' + att.participant_id"
                     :checked="att.attended"
                     @change="handleAttendanceChange(att.participant_id, $event.target.checked)"
-                    :disabled="saving"
+                    :disabled="saving || isPastSession"  
                   >
                 </div>
               </td>
               <td class="align-middle">{{ att.participant_id }}</td>
               <td class="align-middle">{{ att.participant_name }}</td>
+              <td class="align-middle">
+                {{ attendanceSummaryMap[att.participant_id] || 0 }} / {{ totalSessions }}
+              </td>
             </tr>
           </tbody>
         </table>
