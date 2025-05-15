@@ -9,6 +9,7 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3001; // Backend server port
 
+
 // --- Database Setup ---
 // Use a file named 'biblestudy.db' in the same directory as the server
 const DB_PATH = path.join(__dirname, 'biblestudy.db');
@@ -51,6 +52,17 @@ const db = new sqlite3.Database(DB_PATH, (err) => {
                     console.log("Gender column checked/added.");
                 }
             });
+            // Add baptism_interest column if it doesn't exist
+            db.run(`
+                ALTER TABLE participants ADD COLUMN baptism_interest BOOLEAN DEFAULT 0
+            `, (err) => {
+                if (err && !err.message.includes('duplicate column name')) {
+                    console.error("Error adding baptism_interest column:", err.message);
+                } else {
+                    console.log("Baptism interest column checked/added.");
+                }
+            });
+
 
             db.run(`
                 CREATE TABLE IF NOT EXISTS study_sessions (
@@ -139,6 +151,46 @@ app.get('/api/participants', (req, res) => {
     });
 });
 
+// GET attendance summary for all participants (how many sessions attended / total)
+app.get('/api/participants/attendance-summary', (req, res) => {
+    const sql = `
+        WITH total_sessions AS (
+            SELECT COUNT(*) AS total FROM study_sessions
+        ),
+        participant_attendance AS (
+            SELECT
+                p.id,
+                p.name,
+                COUNT(a.id) AS attended_sessions
+            FROM participants p
+            LEFT JOIN attendance a ON p.id = a.participant_id AND a.attended = 1
+            GROUP BY p.id
+        )
+        SELECT 
+            pa.id,
+            pa.name,
+            pa.attended_sessions,
+            ts.total
+        FROM participant_attendance pa
+        CROSS JOIN total_sessions ts
+        ORDER BY pa.name COLLATE NOCASE
+    `;
+
+    db.all(sql, [], (err, rows) => {
+        if (handleDatabaseError(err, res, "Error fetching attendance summary")) return;
+        res.json(rows);
+    });
+});
+
+app.get('/api/participants/interested-in-baptism', (req, res) => {
+    const sql = `SELECT * FROM participants WHERE baptism_interest = 1 ORDER BY name`;
+    db.all(sql, [], (err, rows) => {
+        if (handleDatabaseError(err, res, "Error fetching baptism interested participants")) return;
+        res.json(rows);
+    });
+});
+
+
 // GET a single participant by ID (including referrer name)
 app.get('/api/participants/:id', (req, res) => {
     const { id } = req.params;
@@ -161,15 +213,15 @@ app.get('/api/participants/:id', (req, res) => {
 
 // POST a new participant
 app.post('/api/participants', (req, res) => {
-    const { name, contact_info, age, gender, main_address, locality, date_joined, referred_by_participant_id } = req.body;
+    const { name, contact_info, age, gender, main_address, locality, date_joined, referred_by_participant_id, baptism_interest} = req.body;
     if (!name) {
         return res.status(400).json({ error: "Participant name is required" });
     }
     // Ensure referred_by_participant_id is null if empty or invalid
     const referrerId = (referred_by_participant_id && !isNaN(parseInt(referred_by_participant_id))) ? parseInt(referred_by_participant_id) : null;
 
-    const sql = `INSERT INTO participants (name, contact_info, age, gender, main_address, locality, date_joined, referred_by_participant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
-    const params = [name, contact_info, age, gender, main_address, locality, date_joined || new Date().toISOString().split('T')[0], referrerId];
+    const sql = `INSERT INTO participants (name, contact_info, age, gender, main_address, locality, date_joined, referred_by_participant_id, baptism_interest) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    const params = [name, contact_info, age, gender, main_address, locality, date_joined || new Date().toISOString().split('T')[0], referrerId, baptism_interest ? 1 : 0] ;
 
     db.run(sql, params, function(err) {
         if (handleDatabaseError(err, res, "Error adding participant")) return;
@@ -182,7 +234,8 @@ app.post('/api/participants', (req, res) => {
             main_address,
             locality,
             date_joined: params[6],
-            referred_by_participant_id: referrerId
+            referred_by_participant_id: referrerId,
+            baptism_interest
         });
     });
 });
@@ -190,7 +243,9 @@ app.post('/api/participants', (req, res) => {
 // PUT (update) an existing participant
 app.put('/api/participants/:id', (req, res) => {
     const { id } = req.params;
-    const { name, contact_info, age, gender, main_address, locality, date_joined, referred_by_participant_id } = req.body;
+    const { name, contact_info, age, gender, main_address, locality, date_joined, referred_by_participant_id, baptism_interest } = req.body;
+    const baptismFlag = baptism_interest ? 1 : 0;
+
     if (!name) {
         return res.status(400).json({ error: "Participant name is required" });
     }
@@ -198,10 +253,10 @@ app.put('/api/participants/:id', (req, res) => {
 
     const sql = `
         UPDATE participants
-        SET name = ?, contact_info = ?, age = ?, gender = ?, main_address = ?, locality = ?, date_joined = ?, referred_by_participant_id = ?
+        SET name = ?, contact_info = ?, age = ?, gender = ?, main_address = ?, locality = ?, date_joined = ?, referred_by_participant_id = ?, baptism_interest = ?
         WHERE id = ?
     `;
-    const params = [name, contact_info, age, gender, main_address, locality, date_joined, referrerId, id];
+    const params = [name, contact_info, age, gender, main_address, locality, date_joined, referrerId, id, baptismFlag];
 
     db.run(sql, params, function(err) {
         if (handleDatabaseError(err, res, `Error updating participant ${id}`)) return;
@@ -445,13 +500,26 @@ app.get('/api/dashboard/stats', (req, res) => {
                                 return res.status(500).json({ error: 'Erreur lors de la récupération des statistiques' });
                             }
 
-                            res.json({
+                            const futureBaptismsQuery = `
+                                SELECT id, name FROM participants WHERE baptism_interest = 1
+                            `;
+
+                            db.all(futureBaptismsQuery, [], (err, futureBaptismResults) => {
+                                if (err) {
+                                console.error('Error getting future baptisms:', err);
+                                return res.status(500).json({ error: 'Erreur lors de la récupération des futurs baptêmes' });
+                                }
+
+                                // Réponse finale avec tous les résultats
+                                res.json({
                                 totalParticipants: totalResult[0].total,
                                 attendanceBySession: attendanceResults,
                                 topReferrers: referrerResults,
                                 perfectAttendance: perfectAttendanceResults,
                                 todayAttendanceByLocality: localityResults,
-                                newParticipantsByDay: newParticipantsResults
+                                newParticipantsByDay: newParticipantsResults,
+                                futureBaptisms: futureBaptismResults
+                                });
                             });
                         });
                     });

@@ -37,7 +37,7 @@ const loading = reactive({
 });
 const saving = ref(false);
 const error = ref(null);
-const successNotification = ref({ show: false, message: '', details: '' });
+const successNotification = ref({ show: false, message: '', participantId:null });
 const isMobileNavOpen = ref(false);
 
 // --- Modal State & Refs ---
@@ -47,6 +47,8 @@ const participantFormRef = ref(null);
 
 const showSessionModal = ref(false);
 const sessionFormRef = ref(null);
+
+const attendanceRef = ref(null);
 
 // --- API Call Function (remains the same) ---
 async function apiCall(url, method = 'GET', body = null) {
@@ -76,6 +78,35 @@ async function apiCall(url, method = 'GET', body = null) {
     } finally {
        if(method !== 'GET') saving.value = false;
     }
+}
+
+const confirmIfUnsavedChanges = async (nextView = null) => {
+    if (view.value === 'attendance' && attendanceRef.value?.hasUnsavedChanges) {
+    pendingNavigationTarget.value = nextView;
+    showUnsavedModal.value = true;
+    return false; 
+  }
+  return true; 
+};
+
+function discardUnsavedChanges() {
+  showUnsavedModal.value = false;
+  attendanceRef.value.hasUnsavedChanges = false;
+
+  if (pendingNavigationTarget.value === 'sessions') {
+  selectedSession.value = null;
+  currentAttendance.value = [];
+}
+view.value = pendingNavigationTarget.value;
+pendingNavigationTarget.value = null;
+showUnsavedModal.value = false;
+attendanceRef.value.hasUnsavedChanges = false;
+
+}
+
+function cancelUnsavedNavigation() {
+  showUnsavedModal.value = false;
+  pendingNavigationTarget.value = null;
 }
 
 // --- Data Fetching (remains the same) ---
@@ -118,7 +149,9 @@ const fetchAttendanceForSession = async (sessionId) => {
 onMounted(fetchInitialData);
 
 // --- Navigation (remains the same) ---
-const handleNavigation = (newView) => {
+const handleNavigation = async (newView) => {
+    const ok = await confirmIfUnsavedChanges(newView);
+  if (!ok) return;
   view.value = newView;
   isMobileNavOpen.value = false;
   if (newView === 'sessions' || newView === 'dashboard') {
@@ -130,6 +163,9 @@ const handleNavigation = (newView) => {
     if (mainContent) mainContent.scrollTop = 0;
   });
 };
+
+const showUnsavedModal = ref(false);
+const pendingNavigationTarget = ref(null);
 
 // --- Participant Actions ---
 const handleAddParticipantRequest = () => {
@@ -202,9 +238,14 @@ const handleDeleteSession = async (sessionId) => {
 const handleViewAttendance = async (session) => {
     selectedSession.value = session; view.value = 'attendance'; await fetchAttendanceForSession(session.id);
 };
-const handleBackToSessions = () => {
-    selectedSession.value = null; currentAttendance.value = []; view.value = 'sessions';
+const handleBackToSessions = async () => {
+  const ok = await confirmIfUnsavedChanges('sessions');
+  if (!ok) return;
+  selectedSession.value = null;
+  currentAttendance.value = [];
+  view.value = 'sessions';
 };
+
 const handleSaveAttendance = async (attendanceData) => {
     if (!selectedSession.value) return 'Error: No session selected.';
     let apiError = null;
@@ -244,7 +285,7 @@ const formatDateForDisplay = (dateString) => {
                     <!-- Desktop Title and Subtitle -->
                     <div class="d-none d-sm-block"> 
                         <h1 class="h5 mb-0 fw-bold app-title">IMPACT 2025</h1>
-                        <p class="mb-0 small text-white-50" style="line-height: 1.2;">Hoavy indray Jesosy</p>
+                        <p class="mb-0 small text-white-50" style="line-height: 1.2;">Ho avy indray i Jesosy</p>
                     </div>
 
                     <!-- Mobile Title -->
@@ -314,7 +355,7 @@ const formatDateForDisplay = (dateString) => {
                 <main id="mainContentArea" class="col-12 col-lg-10 main-content-area">
                     <div v-if="loading.app" class="d-flex justify-content-center align-items-center h-100 text-muted p-5">
                         <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div>
-                        <p class="ms-3 fs-5">Loading Application...</p>
+                        <p class="ms-3 fs-5">Chargement de l'Application...</p>
                     </div>
                     <div v-else class="h-100">
                         <div v-if="view === 'dashboard'" class="view-wrapper px-md-4 py-3 h-100">
@@ -342,7 +383,8 @@ const formatDateForDisplay = (dateString) => {
                         </div>
 
                         <div v-if="view === 'attendance' && selectedSession" class="view-wrapper px-md-4 py-3 h-100">
-                            <AttendanceTracker 
+                            <AttendanceTracker
+                                ref="attendanceRef"
                                 :session="selectedSession"
                                 :participants="participants"
                                 :initial-attendance="currentAttendance"
@@ -399,7 +441,7 @@ const formatDateForDisplay = (dateString) => {
         <BaseModal v-model:show="showParticipantModal" :title="editingParticipant ? 'Edit Participant' : 'Add New Participant'" size="modal-lg" @close="editingParticipant = null">
              <ParticipantForm ref="participantFormRef" :initialParticipant="editingParticipant" :participants="participants" :saving="saving" @save="handleSaveParticipant" @cancel="showParticipantModal = false"/>
              <template #footer>
-                 <button type="button" class="btn btn-outline-secondary btn-sm" @click="showParticipantModal = false" :disabled="saving">Cancel</button>
+                 <button type="button" class="btn btn-outline-secondary btn-sm" @click="showParticipantModal = false" :disabled="saving">Annuler</button>
                  <button type="button" class="btn btn-primary btn-sm d-flex align-items-center" @click="participantFormRef?.submit()" :disabled="saving">
                     <span v-if="saving" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                     <Save v-else class="me-2" :size="16" />
@@ -407,20 +449,28 @@ const formatDateForDisplay = (dateString) => {
                  </button>
              </template>
         </BaseModal>
-         <BaseModal v-model:show="showSessionModal" title="Add New Study Session" @close="showSessionModal = false">
-              <SessionForm ref="sessionFormRef" :saving="saving" @save="handleSaveSession" @cancel="showSessionModal = false"/>
-              <template #footer>
-                 <button type="button" class="btn btn-outline-secondary btn-sm" @click="showSessionModal = false" :disabled="saving">Cancel</button>
-                 <button type="button" class="btn btn-primary btn-sm d-flex align-items-center" @click="sessionFormRef?.submit()" :disabled="saving">
+        <BaseModal v-model:show="showSessionModal" title="Add New Study Session" @close="showSessionModal = false">
+            <SessionForm ref="sessionFormRef" :saving="saving" @save="handleSaveSession" @cancel="showSessionModal = false"/>
+            <template #footer>
+                <button type="button" class="btn btn-outline-secondary btn-sm" @click="showSessionModal = false" :disabled="saving">Annuler</button>
+                <button type="button" class="btn btn-primary btn-sm d-flex align-items-center" @click="sessionFormRef?.submit()" :disabled="saving">
                     <span v-if="saving" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                     <Save v-else class="me-2" :size="16" />
                     {{ saving ? 'Adding...' : 'Add Session' }}
-                 </button>
-             </template>
-         </BaseModal>
+                </button>
+            </template>
+        </BaseModal>
+        <BaseModal v-model:show="showUnsavedModal" title="Modifications non enregistrées">
+            <p>Vous avez des changements non enregistrés dans la feuille de présence. Voulez-vous les abandonner ?</p>
+            <template #footer>
+                <button class="btn btn-outline-secondary btn-sm" @click="cancelUnsavedNavigation">Annuler</button>
+                <button class="btn btn-danger btn-sm" @click="discardUnsavedChanges">Abandonner les changements</button>
+            </template>
+        </BaseModal>
+
 
         <footer class="app-footer text-center text-muted small py-3 bg-white border-top mt-auto">
-            IMPACT2025 - Madagascar &copy; {{ new Date().getFullYear() }}
+            IMPACT2025 - Mahabo &copy; {{ new Date().getFullYear() }}
         </footer>
     </div>
 </template>

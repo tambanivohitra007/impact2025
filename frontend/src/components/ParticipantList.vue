@@ -39,6 +39,7 @@ const filteredParticipants = computed(() => {
   return props.participants.filter(p =>
     p.name.toLowerCase().includes(lowerSearch) ||
     (p.contact_info && p.contact_info.toLowerCase().includes(lowerSearch)) ||
+    (p.referrer_name && p.referrer_name.toLowerCase().includes(lowerSearch)) ||
     (p.locality && p.locality.toLowerCase().includes(lowerSearch)) ||
     (p.main_address && p.main_address.toLowerCase().includes(lowerSearch))
   );
@@ -69,8 +70,8 @@ const formatDate = (dateString) => {
 };
 
 const formatGender = (genderCode) => {
-    if (genderCode === 'M') return 'Male';
-    if (genderCode === 'F') return 'Female';
+    if (genderCode === 'M') return 'Masculin';
+    if (genderCode === 'F') return 'Feminin';
     return 'N/A';
 };
 
@@ -93,6 +94,28 @@ const goToPage = (page) => {
   }
 };
 
+const handleBaptismToggle = async (participant) => {
+  const newValue = !participant.baptism_interest;
+  try {
+    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/participants/${participant.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ baptism_interest: newValue ? 1 : 0 })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Erreur lors de la mise à jour');
+    }
+
+    // Optionnel : notification ou rafraîchissement de la liste
+    participant.baptism_interest = newValue;
+  } catch (err) {
+    alert("Erreur : " + err.message);
+  }
+};
+
+
 </script>
 
 <template>
@@ -100,7 +123,7 @@ const goToPage = (page) => {
     <div class="card-header bg-light p-3 flex-shrink-0">
       <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center">
         <h2 class="h5 mb-2 mb-sm-0 text-primary d-flex align-items-center">
-          <Users class="me-2" :size="22" /> Participant List
+          <Users class="me-2" :size="22" />Liste des participants
           <span class="badge bg-danger ms-2">{{ filteredParticipants.length }}</span>
         </h2>
         <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-2 mt-3 mt-sm-0">
@@ -115,7 +138,7 @@ const goToPage = (page) => {
               >
             </div>
             <button @click="handleAddNewParticipantClick" class="btn btn-primary btn-sm d-flex align-items-center ms-sm-2">
-                <PlusCircle class="me-1" :size="16" /> Add Participant
+                <PlusCircle class="me-1" :size="16" /> Ajouter un Participant
             </button>
         </div>
       </div>
@@ -124,9 +147,9 @@ const goToPage = (page) => {
     <div class="card-body p-0 flex-grow-1" style="overflow-y: auto;">
       <div v-if="loading" class="text-center p-5 text-muted d-flex flex-column justify-content-center align-items-center h-100">
         <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Loading...</span>
+            <span class="visually-hidden">Chargement...</span>
         </div>
-        <p class="mt-2 mb-0">Loading participants...</p>
+        <p class="mt-2 mb-0">Chargement des participants...</p>
       </div>
 
       <div v-else-if="!filteredParticipants.length" class="text-center p-5 text-muted d-flex flex-column justify-content-center align-items-center h-100">
@@ -146,8 +169,9 @@ const goToPage = (page) => {
               <tr>
                 <th scope="col" class="px-3">Name</th>
                 <th scope="col" class="px-3">Contact</th>
-                <th scope="col" class="px-3">Locality</th>
-                <th scope="col" class="px-3">Joined</th>
+                <th scope="col" class="px-3">Quartier</th>
+                <th scope="col" class="px-3">Date</th>
+                <th scope="col" class="text-center px-3">Baptême</th>
                 <th scope="col" class="text-end px-3">Actions</th>
               </tr>
             </thead>
@@ -163,12 +187,18 @@ const goToPage = (page) => {
                 <td class="align-middle small px-3">{{ p.locality || 'N/A' }}</td>
                 <td class="align-middle small px-3">{{ formatDate(p.date_joined) }}</td>
                 <td class="text-end align-middle px-3">
-                  <button @click="handleEditClick(p)" title="Edit Participant" class="btn btn-sm btn-outline-secondary me-1 px-2 py-1 lh-1">
-                    <Edit :size="16" />
-                  </button>
-                  <button @click="handleDeleteClick(p.id)" title="Delete Participant" class="btn btn-sm btn-outline-danger px-2 py-1 lh-1">
-                    <Trash2 :size="16" />
-                  </button>
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    :checked="p.baptism_interest"
+                    @change="handleBaptismToggle(p)"
+                    title="Intéressé par le baptême"
+                  />
+                </td>
+                <td class="text-end align-middle px-3">
+                    <button @click="handleEditClick(p)" title="Edit Participant" class="btn btn-sm btn-outline-secondary me-1 px-2 py-1 lh-1">
+                      <Edit :size="16" />
+                    </button>
                 </td>
               </tr>
             </tbody>
@@ -205,10 +235,10 @@ const goToPage = (page) => {
                 <MapPin :size="14" class="me-1 align-text-bottom" /> {{ p.locality }}
               </small>
               <small class="d-block text-muted">
-                <CalendarDays :size="14" class="me-1 align-text-bottom" /> Joined: {{ formatDate(p.date_joined) }}
+                <CalendarDays :size="14" class="me-1 align-text-bottom" /> Date d'inscription: {{ formatDate(p.date_joined) }}
               </small>
               <small v-if="p.referrer_name" class="d-block text-muted">
-                <UsersRound :size="14" class="me-1 align-text-bottom" /> Referred by: {{ p.referrer_name }}
+                <UsersRound :size="14" class="me-1 align-text-bottom" /> Referrent: {{ p.referrer_name }}
               </small>
             </div>
           </div>
@@ -311,4 +341,9 @@ const goToPage = (page) => {
 .card-header h2.h5 { /* Ensure title doesn't have too much margin if it's the only thing */
     margin-bottom: 0 !important;
 }
+.form-check-input {
+  cursor: pointer;
+  transform: scale(1.1);
+}
+
 </style>

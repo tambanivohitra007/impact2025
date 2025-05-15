@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, nextTick, watch } from 'vue';
+import { ref, computed, onMounted, nextTick, watch } from 'vue';
 import { Users, TrendingUp, Award, MapPin, BarChart2, UserPlus, CalendarCheck } from 'lucide-vue-next';
 import Chart from 'chart.js/auto';
 import 'chartjs-adapter-date-fns'; // Import the date adapter
@@ -13,6 +13,31 @@ const stats = ref({
   todayAttendanceByLocality: [],
   newParticipantsByDay: [], // Added this based on your server.js
 });
+
+const totalPresentToday = computed(() => {
+  return stats.value.todayAttendanceByLocality?.reduce((sum, row) => sum + row.present_count, 0) || 0;
+});
+
+const baptismInterested = ref([]);
+const showBaptismListModal = ref(false);
+
+const fetchBaptismInterested = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/participants/interested-in-baptism`);
+    if (!response.ok) throw new Error("Erreur chargement participants baptême");
+    baptismInterested.value = await response.json();
+  } catch (err) {
+    console.error("Erreur fetch baptism participants:", err);
+  }
+};
+
+onMounted(async () => {
+  await fetchStats();
+  await fetchBaptismInterested(); // 👈 ajouté ici
+  await nextTick();
+  initCharts();
+});
+
 
 const loading = ref(true);
 const error = ref(null);
@@ -257,17 +282,58 @@ const formatDateForDisplay = (dateString) => {
         <div class="card shadow-sm h-100 border-start border-success border-4">
           <div class="card-body text-center">
             <CalendarCheck class="text-success mb-2" :size="32" />
-            <h6 class="card-subtitle mb-1 text-muted small text-uppercase">Recorded Sessions</h6>
-            <p class="display-6 fw-bold mb-0">{{ stats.attendanceBySession?.length || 0 }}</p>
+            <h6 class="card-subtitle mb-1 text-muted small text-uppercase">Futurs Baptêmes</h6>
+            <p class="display-6 fw-bold mb-0">{{ baptismInterested.length}}</p>
           </div>
         </div>
       </div>
+
+      <div class="modal fade show" tabindex="-1" style="display: block;" v-if="showBaptismListModal">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">Participants intéressés par le baptême</h5>
+              <button type="button" class="btn-close" @click="showBaptismListModal = false"></button>
+            </div>
+            <div class="modal-body">
+              <table class="table table-striped table-sm">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Nom</th>
+                    <th>Âge</th>
+                    <th>Contact</th>
+                    <th>Localité</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-if="baptismInterested.length === 0">
+                    <td colspan="5" class="text-center text-muted">Aucun participant n’est encore inscrit pour le baptême</td>
+                  </tr>
+                  <tr v-for="p in baptismInterested" :key="p.id">
+                    <td>{{ p.id }}</td>
+                    <td>{{ p.name }}</td>
+                    <td>{{ p.age || '-' }}</td>
+                    <td>{{ p.contact_info || '-' }}</td>
+                    <td>{{ p.locality || '-' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-secondary btn-sm" @click="showBaptismListModal = false">Fermer</button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-backdrop fade show"></div>
+      </div>
+
       <div class="col-md-6 col-lg-3">
         <div class="card shadow-sm h-100 border-start border-info border-4">
           <div class="card-body text-center">
             <TrendingUp class="text-info mb-2" :size="32" />
-            <h6 class="card-subtitle mb-1 text-muted small text-uppercase">Top Referrers</h6>
-            <p class="display-6 fw-bold mb-0">{{ stats.topReferrers?.length || 0 }}</p>
+            <h6 class="card-subtitle mb-1 text-muted small text-uppercase">Présents aujourd'hui</h6>
+            <p class="display-6 fw-bold mb-0">{{ totalPresentToday }}</p>
              </div>
         </div>
       </div>
