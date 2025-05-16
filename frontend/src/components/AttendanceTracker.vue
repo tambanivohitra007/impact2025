@@ -289,7 +289,7 @@ watch(() => props.initialAttendance, (newAttendance) => {
       >
         <span v-if="saving" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
         <Save v-else class="me-2" :size="16" />
-        {{ saving ? 'Saving...' : 'Save Attendance' }}
+        {{ saving ? 'Enregistrement...' : 'Enregistrer Présence' }}
       </button>
     </div>
   </div>
