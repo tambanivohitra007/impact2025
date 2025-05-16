@@ -236,7 +236,7 @@ watch(() => props.initialAttendance, (newAttendance) => {
 
       <div v-if="loading" class="text-center p-5 text-muted">
         <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Loading...</span>
+            <span class="visually-hidden">Chargement...</span>
         </div>
         <p class="mt-2 mb-0">Chargement de la fiche de présence...</p>
       </div>
