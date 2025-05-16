@@ -198,29 +198,29 @@ watch(() => props.initialAttendance, (newAttendance) => {
     <div class="card-header bg-light p-3">
       <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center mb-2 gap-2">
         <button @click="goBack" class="btn btn-sm btn-outline-secondary d-flex align-items-center">
-          <ChevronLeft class="me-1" :size="16" /> Back
+          <ChevronLeft class="me-1" :size="16" /> Retour
         </button>
         <div v-if="showSaveConfirmation" class="alert alert-success py-1 px-2 small m-0 flex-grow-1 text-center" role="alert">
-          Attendance saved!
+          Présence enregistrée!
         </div>
         <button @click="requestDeleteSession" title="Delete Session" class="btn btn-sm btn-outline-danger d-flex align-items-center">
-          <Trash2 class="me-1" :size="16" /> Delete Session
+          <Trash2 class="me-1" :size="16" /> Supprimer Session
         </button>
       </div>
 
       <h5 class="card-title mb-1 d-flex align-items-center">
-        <UserCheck class="me-2" :size="20" /> Attendance
+        <UserCheck class="me-2" :size="20" /> Présence
       </h5>
       <p class="card-subtitle text-muted small mb-2">
         Session: <span class="fw-medium">{{ formatDate(session.session_date) }}</span> - {{ session.topic || 'General Study' }}
       </p>
       <p class="card-subtitle text-muted small">
-        Marked: <span class="fw-medium">{{ attendanceCount.attended }} / {{ attendanceCount.total }}</span>
+        Présents: <span class="fw-medium">{{ attendanceCount.attended }} / {{ attendanceCount.total }}</span>
       </p>
       <div class="input-group input-group-sm mt-2" style="max-width: 320px;">
         <span class="input-group-text bg-white border-end-0"><Search :size="16"/></span>
         <input
-          type="search"
+          type="Rechercher par Nom ou ID"
           class="form-control border-start-0"
           placeholder="Rechercher par nom ou ID..."
           v-model="searchQuery"
@@ -238,14 +238,14 @@ watch(() => props.initialAttendance, (newAttendance) => {
         <div class="spinner-border text-primary" role="status">
             <span class="visually-hidden">Loading...</span>
         </div>
-        <p class="mt-2 mb-0">Loading attendance...</p>
+        <p class="mt-2 mb-0">Chargement de la fiche de présence...</p>
       </div>
 
       <div v-else class="table-responsive" style="max-height: 55vh; overflow-y: auto;">
         <table class="table table-hover mb-0">
           <thead class="table-light" style="position: sticky; top: 0; z-index: 1;">
             <tr>
-              <th scope="col" class="text-center" style="width: 80px;">Attended</th>
+              <th scope="col" class="text-center" style="width: 80px;">Présent</th>
               <th scope="col">ID</th>
               <th scope="col">Nom</th>
               <th scope="col">Sessions assistées</th>

@@ -240,6 +240,22 @@ app.post('/api/participants', (req, res) => {
     });
 });
 
+// PATCH seulement pour baptism_interest
+app.patch('/api/participants/:id/baptism-interest', (req, res) => {
+    const { id } = req.params;
+    const { baptism_interest } = req.body;
+  
+    if (typeof baptism_interest !== 'boolean') {
+      return res.status(400).json({ error: "baptism_interest must be boolean" });
+    }
+  
+    const sql = `UPDATE participants SET baptism_interest = ? WHERE id = ?`;
+    db.run(sql, [baptism_interest ? 1 : 0, id], function(err) {
+      if (handleDatabaseError(err, res, `Error updating baptism_interest for participant ${id}`)) return;
+      res.json({ message: "Baptism interest updated", id: id, baptism_interest });
+    });
+});
+
 // PUT (update) an existing participant
 app.put('/api/participants/:id', (req, res) => {
     const { id } = req.params;
@@ -253,10 +269,10 @@ app.put('/api/participants/:id', (req, res) => {
 
     const sql = `
         UPDATE participants
-        SET name = ?, contact_info = ?, age = ?, gender = ?, main_address = ?, locality = ?, date_joined = ?, referred_by_participant_id = ?, baptism_interest = ?
+        SET name = ?, contact_info = ?, age = ?, gender = ?, main_address = ?, locality = ?, date_joined = ?, referred_by_participant_id = ?
         WHERE id = ?
     `;
-    const params = [name, contact_info, age, gender, main_address, locality, date_joined, referrerId, id, baptismFlag];
+    const params = [name, contact_info, age, gender, main_address, locality, date_joined, referrerId, id];
 
     db.run(sql, params, function(err) {
         if (handleDatabaseError(err, res, `Error updating participant ${id}`)) return;
@@ -266,6 +282,7 @@ app.put('/api/participants/:id', (req, res) => {
         res.json({ message: "Participant updated successfully", id: id, changes: this.changes });
     });
 });
+  
 
 // DELETE a participant
 app.delete('/api/participants/:id', (req, res) => {

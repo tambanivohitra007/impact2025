@@ -80,7 +80,7 @@ const goToPage = (page) => {
     <div class="card-header bg-light p-3 flex-shrink-0">
       <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center">
         <h2 class="h5 mb-2 mb-sm-0 text-primary d-flex align-items-center">
-          <ListChecks class="me-2" :size="22" /> Session List
+          <ListChecks class="me-2" :size="22" /> Liste des Sessions
           <span class="badge bg-danger ms-2">{{ sessions.length }}</span>
         </h2>
         <button @click="handleAddNewSessionClick" class="btn btn-primary btn-sm d-flex align-items-center mt-2">
@@ -92,7 +92,7 @@ const goToPage = (page) => {
     <div class="card-body p-0 flex-grow-1" style="overflow-y: auto;">
       <div v-if="loading" class="text-center p-5 text-muted d-flex flex-column justify-content-center align-items-center h-100">
         <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Loading...</span>
+            <span class="visually-hidden">Chargement...</span>
         </div>
         <p class="mt-2 mb-0">Chargement sessions...</p>
       </div>

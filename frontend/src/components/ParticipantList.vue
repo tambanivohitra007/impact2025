@@ -97,10 +97,10 @@ const goToPage = (page) => {
 const handleBaptismToggle = async (participant) => {
   const newValue = !participant.baptism_interest;
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/participants/${participant.id}`, {
-      method: 'PUT',
+    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/participants/${participant.id}/baptism-interest`, {
+      method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ baptism_interest: newValue ? 1 : 0 })
+      body: JSON.stringify({ baptism_interest: newValue })
     });
 
     if (!response.ok) {
@@ -108,12 +108,12 @@ const handleBaptismToggle = async (participant) => {
       throw new Error(errorData.error || 'Erreur lors de la mise à jour');
     }
 
-    // Optionnel : notification ou rafraîchissement de la liste
-    participant.baptism_interest = newValue;
+    participant.baptism_interest = newValue; // Mise à jour locale
   } catch (err) {
     alert("Erreur : " + err.message);
   }
 };
+
 
 
 </script>
@@ -132,7 +132,7 @@ const handleBaptismToggle = async (participant) => {
               <input
                 type="search"
                 class="form-control border-start-0"
-                placeholder="Search..."
+                placeholder="Rechercher..."
                 v-model="searchTerm"
                 aria-label="Search participants"
               >
@@ -167,7 +167,7 @@ const handleBaptismToggle = async (participant) => {
           <table class="table table-hover table-bordered mb-0">
             <thead class="table-light sticky-top" style="z-index: 1;">
               <tr>
-                <th scope="col" class="px-3">Name</th>
+                <th scope="col" class="px-3">Nom</th>
                 <th scope="col" class="px-3">Contact</th>
                 <th scope="col" class="px-3">Quartier</th>
                 <th scope="col" class="px-3">Date</th>
@@ -222,9 +222,9 @@ const handleBaptismToggle = async (participant) => {
                   <button @click="handleEditClick(p)" title="Edit Participant" class="btn btn-sm btn-outline-secondary px-2 py-1 lh-1">
                     <Edit :size="16" />
                   </button>
-                  <button @click="handleDeleteClick(p.id)" title="Delete Participant" class="btn btn-sm btn-outline-danger px-2 py-1 lh-1">
+                  <!-- <button @click="handleDeleteClick(p.id)" title="Delete Participant" class="btn btn-sm btn-outline-danger px-2 py-1 lh-1">
                     <Trash2 :size="16" />
-                  </button>
+                  </button> -->
               </div>
             </div>
             <div class="mt-1">
@@ -238,8 +238,20 @@ const handleBaptismToggle = async (participant) => {
                 <CalendarDays :size="14" class="me-1 align-text-bottom" /> Date d'inscription: {{ formatDate(p.date_joined) }}
               </small>
               <small v-if="p.referrer_name" class="d-block text-muted">
-                <UsersRound :size="14" class="me-1 align-text-bottom" /> Referrent: {{ p.referrer_name }}
+                <UsersRound :size="14" class="me-1 align-text-bottom" /> Référent: {{ p.referrer_name }}
               </small>
+              <div class="form-check mt-2">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  :id="`baptism-mobile-${p.id}`"
+                  :checked="p.baptism_interest"
+                  @change="handleBaptismToggle(p)"
+                />
+                <label class="form-check-label small" :for="`baptism-mobile-${p.id}`">
+                  Intéressé par le baptême
+                </label>
+              </div>
             </div>
           </div>
         </div>
@@ -252,7 +264,7 @@ const handleBaptismToggle = async (participant) => {
         :disabled="currentPage === 1"
         class="btn btn-sm btn-outline-secondary"
       >
-        Previous
+        Précédent
       </button>
       <span>Page {{ currentPage }} of {{ totalPages }}</span>
       <button
@@ -260,7 +272,7 @@ const handleBaptismToggle = async (participant) => {
         :disabled="currentPage === totalPages"
         class="btn btn-sm btn-outline-secondary"
       >
-        Next
+        Suivant
       </button>
     </div>
   </div>

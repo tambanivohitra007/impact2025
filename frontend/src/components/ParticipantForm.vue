@@ -90,6 +90,13 @@ watch(() => props.initialParticipant, (newVal) => {
   resetForm(newVal);
 }, { immediate: true, deep: true });
 
+watch(() => formData.referred_by_participant_id, (newVal) => {
+  if (newVal !== null && newVal !== '' && !isNaN(newVal)) {
+    formData.joining_reason = 'Amis/Famille';
+  }
+});
+
+
 // --- Computed Properties ---
 const availableReferrers = computed(() => {
   return props.participants.filter(p => p.id !== formData.id);
@@ -228,8 +235,8 @@ defineExpose({
           <option value="Andoharanofotsy">Andoharanofotsy</option>
           <option value="Manandona">Manandona</option>
           <option value="Iavoloha">Iavoloha</option>
-          <option value="Iavoloha">Volotara</option>
-          <option value="Iavoloha">Ambohimanambola</option>
+          <option value="Volotara">Volotara</option>
+          <option value="Ambohimanambola">Ambohimanambola</option>
           <option value="Autre">Autre</option>
         </select>
       </div>
