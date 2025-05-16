@@ -33,6 +33,8 @@ const props = defineProps({
   }
 });
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 // --- Emits ---
 const emit = defineEmits([
   'back',             // Signal to go back to the session list
@@ -95,7 +97,7 @@ const filteredAttendance = computed(() => {
 
 const fetchAttendanceSummary = async () => {
   try {
-    const response = await fetch('http://localhost:3001/api/participants/attendance-summary');
+    const response = await fetch(`${API_BASE_URL}/participants/attendance-summary`);
     if (!response.ok) throw new Error('Erreur de chargement du résumé de présence');
 
     const data = await response.json();

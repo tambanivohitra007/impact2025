@@ -1,65 +1,47 @@
 <script setup>
 import { ref, computed, onMounted, nextTick, watch } from 'vue';
-import { Users, TrendingUp, Award, MapPin, BarChart2, UserPlus, CalendarCheck } from 'lucide-vue-next';
+import { Users, TrendingUp, Award, MapPin, BarChart2, UserPlus, CalendarCheck, AlertCircle } from 'lucide-vue-next';
 import Chart from 'chart.js/auto';
 import 'chartjs-adapter-date-fns'; // Import the date adapter
+
+// --- Props (if you decide to pass apiCall function later) ---
+// const props = defineProps({
+//   apiCall: {
+//     type: Function,
+//     required: true // If you centralize API calls
+//   }
+// });
 
 // --- State ---
 const stats = ref({
   totalParticipants: 0,
-  attendanceBySession: [], // For line chart
+  attendanceBySession: [],
   topReferrers: [],
   perfectAttendance: [],
   todayAttendanceByLocality: [],
-  newParticipantsByDay: [], // Added this based on your server.js
+  newParticipantsByDay: [],
+  futureBaptisms: [], // Added this to stats object for consistency
 });
 
 const totalPresentToday = computed(() => {
   return stats.value.todayAttendanceByLocality?.reduce((sum, row) => sum + row.present_count, 0) || 0;
 });
 
-const baptismInterested = ref([]);
+// Removed baptismInterested as a separate ref, merged into stats.value.futureBaptisms
 const showBaptismListModal = ref(false);
-
-
-const fetchBaptismInterested = async () => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/participants/interested-in-baptism`);
-    if (!response.ok) throw new Error("Erreur chargement participants baptême");
-    baptismInterested.value = await response.json();
-  } catch (err) {
-    console.error("Erreur fetch baptism participants:", err);
-  }
-};
-
-onMounted(async () => {
-  await fetchStats();
-  await fetchBaptismInterested(); // 👈 ajouté ici
-  await nextTick();
-  initCharts();
-});
-
-watch(showBaptismListModal, (val) => {
-  if (val) {
-    document.body.classList.add('modal-open');
-  } else {
-    document.body.classList.remove('modal-open');
-  }
-});
-
 
 const loading = ref(true);
 const error = ref(null);
-const selectedDate = ref(new Date().toISOString().split('T')[0]); // For "Today's Attendance by Locality"
+const selectedDate = ref(new Date().toISOString().split('T')[0]);
 
 // Chart instances
 let attendanceChartInstance = null;
 let newParticipantsChartInstance = null;
 
-// --- API Call ---
+// --- API Configuration ---
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
-// const API_BASE_URL = 'http://localhost:3001/api';
 
+// --- API Calls ---
 const fetchStats = async (date = null) => {
   loading.value = true;
   error.value = null;
@@ -68,32 +50,76 @@ const fetchStats = async (date = null) => {
     queryParams = `?date=${date}`;
   }
 
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+  const token = localStorage.getItem('authToken');
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  } else {
+    console.warn(`DashboardView: No auth token found for API call to /dashboard/stats.`);
+    // error.value = "Authentication token not found. Please log in.";
+    // loading.value = false;
+    // return; // Optionally stop if token is absolutely required and not just for server check
+  }
+
   try {
-    const response = await fetch(`${API_BASE_URL}/dashboard/stats${queryParams}`);
+    const response = await fetch(`${API_BASE_URL}/dashboard/stats${queryParams}`, { headers });
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ message: 'Failed to fetch dashboard stats and could not parse error response.' }));
+      // Use the error message from the server if available
       throw new Error(errorData.error || errorData.message || `HTTP error ${response.status}`);
     }
     const fetchedStats = await response.json();
-    // Ensure all keys exist, even if empty, to prevent template errors
     stats.value = {
-        totalParticipants: fetchedStats.totalParticipants || 0,
-        attendanceBySession: fetchedStats.attendanceBySession || [],
-        topReferrers: fetchedStats.topReferrers || [],
-        perfectAttendance: fetchedStats.perfectAttendance || [],
-        todayAttendanceByLocality: fetchedStats.todayAttendanceByLocality || [],
-        newParticipantsByDay: fetchedStats.newParticipantsByDay || [],
+      totalParticipants: fetchedStats.totalParticipants || 0,
+      attendanceBySession: fetchedStats.attendanceBySession || [],
+      topReferrers: fetchedStats.topReferrers || [],
+      perfectAttendance: fetchedStats.perfectAttendance || [],
+      todayAttendanceByLocality: fetchedStats.todayAttendanceByLocality || [],
+      newParticipantsByDay: fetchedStats.newParticipantsByDay || [],
+      futureBaptisms: fetchedStats.futureBaptisms || [], // Ensure this is populated from stats
     };
   } catch (err) {
-    console.error("Error fetching stats:", err);
-    error.value = err.message;
+    console.error("DashboardView: Error fetching stats:", err);
+    error.value = err.message; // This will display the "Access denied. No token provided." if token is missing.
   } finally {
     loading.value = false;
   }
 };
 
+
+// This function is now part of fetchStats, as futureBaptisms is included in the dashboard stats response
+// If you still need it separately for some reason, you'd apply the same header logic:
+// const fetchBaptismInterested = async () => {
+//   const headers = { 'Content-Type': 'application/json' };
+//   const token = localStorage.getItem('authToken');
+//   if (token) {
+//     headers['Authorization'] = `Bearer ${token}`;
+//   } else {
+//     console.warn(`DashboardView: No auth token found for API call to /participants/interested-in-baptism.`);
+//   }
+//   try {
+//     const response = await fetch(`${API_BASE_URL}/participants/interested-in-baptism`, { headers });
+//     if (!response.ok) {
+//         const errorData = await response.json().catch(() => ({ message: 'Failed to fetch baptism interested and could not parse error response.' }));
+//         throw new Error(errorData.error || errorData.message || `HTTP error ${response.status}`);
+//     }
+//     // Assuming stats.value.futureBaptisms is the correct place now
+//     stats.value.futureBaptisms = await response.json();
+//   } catch (err) {
+//     console.error("DashboardView: Error fetching baptism participants:", err);
+//     // Handle error appropriately, maybe set a specific error ref for this data
+//   }
+// };
+
+
 // --- Chart Initialization ---
 const initCharts = () => {
+  if (error.value) { // Don't try to init charts if there was an error fetching data
+      console.warn("Skipping chart initialization due to data fetching error.");
+      return;
+  }
   initAttendanceChart();
   initNewParticipantsChart();
 };
@@ -110,15 +136,15 @@ const initAttendanceChart = () => {
 
   if (stats.value.attendanceBySession.length === 0 && !loading.value) {
       const canvasCtx = ctx.getContext('2d');
-      canvasCtx.clearRect(0, 0, ctx.width, ctx.height);
+      canvasCtx.clearRect(0, 0, ctx.width, ctx.height); // Clear previous drawing
       canvasCtx.font = "14px Arial";
-      canvasCtx.fillStyle = "#6c757d";
+      canvasCtx.fillStyle = "#6c757d"; // text-muted color
       canvasCtx.textAlign = "center";
-      canvasCtx.fillText("No attendance data for chart.", ctx.width / 2, ctx.height / 2);
+      canvasCtx.fillText("No attendance data available for the chart.", ctx.width / 2, ctx.height / 2);
       return;
   }
 
-  // Sort data by date for the line chart
+
   const chartData = [...stats.value.attendanceBySession].sort((a, b) => new Date(a.session_date) - new Date(b.session_date));
 
   attendanceChartInstance = new Chart(ctx, {
@@ -128,7 +154,7 @@ const initAttendanceChart = () => {
       datasets: [{
         label: 'Participants Present',
         data: chartData.map(d => d.attendance_count),
-        borderColor: 'rgb(54, 162, 235)', // Bootstrap Primary
+        borderColor: 'rgb(54, 162, 235)',
         backgroundColor: 'rgba(54, 162, 235, 0.2)',
         tension: 0.2,
         fill: true,
@@ -151,13 +177,11 @@ const initAttendanceChart = () => {
         x: {
           type: 'time',
           time: { unit: 'day', tooltipFormat: 'MMM d, yyyy', displayFormats: { day: 'MMM d' } },
-          title: { display: false, text: 'Session Date' },
           grid: { display: false }
         },
         y: {
           beginAtZero: true,
           ticks: { stepSize: 1, precision: 0 },
-          title: { display: false, text: 'Count' }
         }
       }
     }
@@ -169,22 +193,21 @@ const initNewParticipantsChart = () => {
     newParticipantsChartInstance.destroy();
   }
   const ctx = document.getElementById('newParticipantsChart');
-   if (!ctx || !stats.value.newParticipantsByDay) {
+    if (!ctx || !stats.value.newParticipantsByDay) {
     console.warn("New participants chart canvas not found or no data.");
     return;
   }
 
   if (stats.value.newParticipantsByDay.length === 0 && !loading.value) {
       const canvasCtx = ctx.getContext('2d');
-      canvasCtx.clearRect(0, 0, ctx.width, ctx.height);
+      canvasCtx.clearRect(0, 0, ctx.width, ctx.height); // Clear previous drawing
       canvasCtx.font = "14px Arial";
-      canvasCtx.fillStyle = "#6c757d";
+      canvasCtx.fillStyle = "#6c757d"; // text-muted color
       canvasCtx.textAlign = "center";
-      canvasCtx.fillText("No new participant data for chart.", ctx.width / 2, ctx.height / 2);
+      canvasCtx.fillText("No new participant data available for the chart.", ctx.width / 2, ctx.height / 2);
       return;
   }
 
-  // Sort data by date
   const chartData = [...stats.value.newParticipantsByDay].sort((a, b) => new Date(a.join_date) - new Date(b.join_date));
 
   newParticipantsChartInstance = new Chart(ctx, {
@@ -194,7 +217,7 @@ const initNewParticipantsChart = () => {
       datasets: [{
         label: 'New Participants',
         data: chartData.map(d => d.new_participants),
-        backgroundColor: 'rgba(25, 135, 84, 0.7)', // Bootstrap Success
+        backgroundColor: 'rgba(25, 135, 84, 0.7)',
         borderColor: 'rgb(25, 135, 84)',
         borderWidth: 1
       }]
@@ -204,7 +227,7 @@ const initNewParticipantsChart = () => {
       maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
-         tooltip: {
+          tooltip: {
           callbacks: {
             title: (tooltipItems) => new Date(tooltipItems[0].parsed.x).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
           }
@@ -214,13 +237,11 @@ const initNewParticipantsChart = () => {
         x: {
           type: 'time',
           time: { unit: 'day', tooltipFormat: 'MMM d, yyyy', displayFormats: { day: 'MMM d' } },
-          title: { display: false, text: 'Join Date' },
           grid: { display: false }
         },
         y: {
           beginAtZero: true,
           ticks: { stepSize: 1, precision: 0 },
-          title: { display: false, text: 'Count' }
         }
       }
     }
@@ -229,250 +250,251 @@ const initNewParticipantsChart = () => {
 
 // --- Lifecycle Hooks ---
 onMounted(async () => {
-  await fetchStats(selectedDate.value); // Fetch for today initially
+  await fetchStats(selectedDate.value);
+  // fetchBaptismInterested is no longer needed if futureBaptisms is part of dashboard/stats
   await nextTick();
   initCharts();
 });
 
-// Re-fetch stats and update charts if the selectedDate changes
 watch(selectedDate, async (newDate) => {
     await fetchStats(newDate);
     await nextTick();
-    // Only need to re-init charts if their data source depends on the date (e.g., todayAttendanceByLocality)
-    // For now, the main charts are not date-dependent, but this is good practice if they were.
-    // We might need to update the locality data specifically if the chart was for it.
-    // For the current setup, re-initializing all charts is fine as fetchStats updates all data.
-    initCharts();
+    initCharts(); // Re-initialize charts with potentially new data for the selected date
+});
+
+watch(showBaptismListModal, (val) => {
+  if (val) {
+    document.body.classList.add('modal-open');
+  } else {
+    document.body.classList.remove('modal-open');
+  }
 });
 
 // Helper to format date for display
 const formatDateForDisplay = (dateString) => {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+    // Check if it's already a Date object (e.g., from chart labels)
+    if (dateString instanceof Date) {
+        return dateString.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+    }
+    // Attempt to parse if it's a string
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) { // Check if date is invalid
+        return dateString; // Return original string if parsing failed
+    }
+    return date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
 };
 
 </script>
 
 <template>
-    <div class="card w-100 shadow-sm mb-4 h-100 d-flex flex-column">
-      <div class="card-header bg-light p-3 flex-shrink-0">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h4 class="mb-0 d-flex align-items-center">
-              <BarChart2 :size="28" class="me-2 text-primary" />Dashboard
-          </h4>
-          <div>
-              <label for="statsDate" class="form-label form-label-sm visually-hidden">Date pour les Stats des quartiers</label>
-              <input type="date" class="form-control form-control-sm" id="statsDate" v-model="selectedDate">
-          </div>
-      </div>
-      </div>
-      <hr>
-      <div v-if="loading" class="text-center p-5">
-      <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
-        <span class="visually-hidden">Chargement...</span>
-      </div>
-      <p class="mt-2 text-muted">Chargement des données du dashboard ...</p>
-    </div>
-    <div v-else-if="error" class="alert alert-danger" role="alert">
-      Erreur lors du chargement des données du dashboard: {{ error }}
-    </div>
-    
-    <div v-else class="row g-3 g-lg-4">
-      <div class="col-md-6 col-lg-3">
-        <div class="card shadow-sm h-100 border-start border-primary border-4">
-          <div class="card-body text-center">
-            <Users class="text-primary mb-2" :size="32" />
-            <h6 class="card-subtitle mb-1 text-muted small text-uppercase">Nombre des Participants</h6>
-            <p class="display-6 fw-bold mb-0">{{ stats.totalParticipants }}</p>
-          </div>
-        </div>
-      </div>
-    <div class="col-md-6 col-lg-3">
-      <div
-        class="card shadow-sm h-100 border-start border-success border-4"
-        style="cursor: pointer;"
-        @click="showBaptismListModal = true"
-      >
-        <div class="card-body text-center">
-          <CalendarCheck class="text-success mb-2" :size="32" />
-          <h6 class="card-subtitle mb-1 text-muted small text-uppercase">Futurs Baptêmes</h6>
-          <p class="display-6 fw-bold mb-0">{{ baptismInterested.length }}</p>
-        </div>
-      </div>
-    </div>
-
-    <template v-if="showBaptismListModal">
-      <div class="modal fade show" tabindex="-1" style="display: block;" v-if="showBaptismListModal">
-        <div class="modal-dialog modal-lg modal-dialog-centered">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h5 class="modal-title">Participants à baptiser</h5>
-              <button type="button" class="btn-close" @click="showBaptismListModal = false"></button>
+    <div class="dashboard-container container-fluid py-3 h-100 d-flex flex-column">
+      <div class="card shadow-sm flex-grow-1 d-flex flex-column">
+        <div class="card-header bg-light p-3 flex-shrink-0">
+            <div class="d-flex flex-wrap justify-content-between align-items-center">
+                <h4 class="mb-0 d-flex align-items-center">
+                    <BarChart2 :size="28" class="me-2 text-primary" />Dashboard
+                </h4>
+                <div class="ms-auto mt-2 mt-md-0">
+                    <label for="statsDate" class="form-label form-label-sm visually-hidden">Date for Locality Stats</label>
+                    <input type="date" class="form-control form-control-sm" id="statsDate" v-model="selectedDate" style="max-width: 180px;">
+                </div>
             </div>
-            <div class="modal-body">
-              <table class="table table-striped table-sm">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Nom</th>
-                    <th>Âge</th>
-                    <th>Contact</th>
-                    <th>Quartier</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-if="baptismInterested.length === 0">
-                    <td colspan="5" class="text-center text-muted">Aucun participant n’est encore inscrit pour le baptême</td>
-                  </tr>
-                  <tr v-for="p in baptismInterested" :key="p.id">
-                    <td>{{ p.id }}</td>
-                    <td>{{ p.name }}</td>
-                    <td>{{ p.age || '-' }}</td>
-                    <td>{{ p.contact_info || '-' }}</td>
-                    <td>{{ p.locality || '-' }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <div class="modal-footer">
-              <button class="btn btn-secondary btn-sm" @click="showBaptismListModal = false">Fermer</button>
-            </div>
-          </div>
         </div>
-      </div>
-    </template>
 
-      <div class="col-md-6 col-lg-3">
-        <div class="card shadow-sm h-100 border-start border-info border-4">
-          <div class="card-body text-center">
-            <TrendingUp class="text-info mb-2" :size="32" />
-            <h6 class="card-subtitle mb-1 text-muted small text-uppercase">Présents aujourd'hui</h6>
-            <p class="display-6 fw-bold mb-0">{{ totalPresentToday }}</p>
-             </div>
-        </div>
-      </div>
-       <div class="col-md-6 col-lg-3">
-        <div class="card shadow-sm h-100 border-start border-warning border-4">
-          <div class="card-body text-center">
-            <Award class="text-warning mb-2" :size="32" />
-            <h6 class="card-subtitle mb-1 text-muted small text-uppercase">Paticipants assidus</h6>
-            <p class="display-6 fw-bold mb-0">{{ stats.perfectAttendance?.length || 0 }}</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-lg-7">
-        <div class="card shadow-sm h-100">
-          <div class="card-header bg-light py-2">
-            <h6 class="card-title d-flex align-items-center mb-0 small text-uppercase">
-              <BarChart2 class="me-2 text-primary" :size="18" />
-              Participants présents par Session
-            </h6>
-          </div>
-          <div class="card-body">
-            <div style="height: 280px;">
-              <canvas id="attendanceChart"></canvas>
+        <div class="card-body flex-grow-1" style="overflow-y: auto;">
+            <div v-if="loading" class="text-center p-5">
+                <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2 text-muted">Loading dashboard data...</p>
             </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-lg-5">
-        <div class="card shadow-sm h-100">
-          <div class="card-header bg-light py-2">
-            <h6 class="card-title d-flex align-items-center mb-0 small text-uppercase">
-              <TrendingUp class="me-2 text-info" :size="18" /> Top Référents
-            </h6>
-          </div>
-          <div class="card-body p-0" style="max-height: 280px; overflow-y: auto;">
-            <ul v-if="stats.topReferrers && stats.topReferrers.length > 0" class="list-group list-group-flush">
-              <li v-for="ref in stats.topReferrers.slice(0, 7)" :key="ref.id" class="list-group-item d-flex justify-content-between align-items-center py-2 px-3">
-                <span class="small">{{ ref.name }}</span>
-                <span class="badge bg-info rounded-pill">{{ ref.referral_count }}</span>
-              </li>
-            </ul>
-            <p v-else class="text-muted text-center small p-3 mb-0">Pas de données de référent disponibles.</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-lg-7">
-        <div class="card shadow-sm h-100">
-            <div class="card-header bg-light py-2">
-                <h6 class="card-title d-flex align-items-center mb-0 small text-uppercase">
-                    <UserPlus class="me-2 text-success" :size="18" /> Nouveaux inscrits
-                </h6>
+            <div v-else-if="error" class="alert alert-danger mx-3" role="alert">
+                <AlertCircle :size="20" class="me-2" />
+                Error loading dashboard data: {{ error }}
             </div>
-            <div class="card-body">
-                <div style="height: 280px;">
-                    <canvas id="newParticipantsChart"></canvas>
+            
+            <div v-else class="row g-3 g-lg-4">
+                <div class="col-sm-6 col-md-4 col-lg-3">
+                    <div class="card shadow-sm h-100 border-start border-primary border-4">
+                        <div class="card-body text-center d-flex flex-column justify-content-center">
+                            <Users class="text-primary mb-2 mx-auto" :size="32" />
+                            <h6 class="card-subtitle mb-1 text-muted small text-uppercase">Total Participants</h6>
+                            <p class="display-6 fw-bold mb-0">{{ stats.totalParticipants }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-md-4 col-lg-3">
+                    <div class="card shadow-sm h-100 border-start border-success border-4" style="cursor: pointer;" @click="showBaptismListModal = true">
+                        <div class="card-body text-center d-flex flex-column justify-content-center">
+                            <CalendarCheck class="text-success mb-2 mx-auto" :size="32" />
+                            <h6 class="card-subtitle mb-1 text-muted small text-uppercase">Future Baptisms</h6>
+                            <p class="display-6 fw-bold mb-0">{{ stats.futureBaptisms?.length || 0 }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-md-4 col-lg-3">
+                    <div class="card shadow-sm h-100 border-start border-info border-4">
+                        <div class="card-body text-center d-flex flex-column justify-content-center">
+                            <TrendingUp class="text-info mb-2 mx-auto" :size="32" />
+                            <h6 class="card-subtitle mb-1 text-muted small text-uppercase">Present Today ({{ formatDateForDisplay(selectedDate) }})</h6>
+                            <p class="display-6 fw-bold mb-0">{{ totalPresentToday }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-md-4 col-lg-3">
+                    <div class="card shadow-sm h-100 border-start border-warning border-4">
+                        <div class="card-body text-center d-flex flex-column justify-content-center">
+                            <Award class="text-warning mb-2 mx-auto" :size="32" />
+                            <h6 class="card-subtitle mb-1 text-muted small text-uppercase">Perfect Attendance</h6>
+                            <p class="display-6 fw-bold mb-0">{{ stats.perfectAttendance?.length || 0 }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-7 mt-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light py-2">
+                            <h6 class="card-title d-flex align-items-center mb-0 small text-uppercase">
+                                <BarChart2 class="me-2 text-primary" :size="18" /> Attendance per Session
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div style="height: 280px;">
+                                <canvas id="attendanceChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-5 mt-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light py-2">
+                            <h6 class="card-title d-flex align-items-center mb-0 small text-uppercase">
+                                <TrendingUp class="me-2 text-info" :size="18" /> Top Referrers
+                            </h6>
+                        </div>
+                        <div class="card-body p-0" style="max-height: 280px; overflow-y: auto;">
+                            <ul v-if="stats.topReferrers && stats.topReferrers.length > 0" class="list-group list-group-flush">
+                                <li v-for="ref in stats.topReferrers.slice(0, 7)" :key="ref.id" class="list-group-item d-flex justify-content-between align-items-center py-2 px-3">
+                                    <span class="small text-truncate" :title="ref.name">{{ ref.name }}</span>
+                                    <span class="badge bg-info rounded-pill ms-2">{{ ref.referral_count }}</span>
+                                </li>
+                            </ul>
+                            <p v-else class="text-muted text-center small p-3 mb-0">No referrer data available.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-7 mt-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light py-2">
+                            <h6 class="card-title d-flex align-items-center mb-0 small text-uppercase">
+                                <UserPlus class="me-2 text-success" :size="18" /> New Participants by Day
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div style="height: 280px;">
+                                <canvas id="newParticipantsChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-5 mt-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light py-2">
+                            <h6 class="card-title d-flex align-items-center mb-0 small text-uppercase">
+                                <Award class="me-2 text-warning" :size="18" /> Perfect Attendance List
+                            </h6>
+                        </div>
+                        <div class="card-body p-0" style="max-height: 280px; overflow-y: auto;">
+                            <ul v-if="stats.perfectAttendance && stats.perfectAttendance.length > 0" class="list-group list-group-flush">
+                                <li v-for="p in stats.perfectAttendance.slice(0, 10)" :key="p.id" class="list-group-item py-2 px-3 small text-truncate" :title="p.name">
+                                    {{ p.name }}
+                                </li>
+                            </ul>
+                            <p v-else class="text-muted text-center small p-3 mb-0">No one has attended all sessions yet.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 mt-4">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-light py-2">
+                            <h6 class="card-title d-flex align-items-center mb-0 small text-uppercase">
+                                <MapPin class="me-2 text-danger" :size="18" />
+                                Attendance by Locality ({{ formatDateForDisplay(selectedDate) }})
+                            </h6>
+                        </div>
+                        <div class="card-body p-0">
+                            <div v-if="stats.todayAttendanceByLocality && stats.todayAttendanceByLocality.length > 0" class="table-responsive">
+                                <table class="table table-sm table-hover table-striped mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Locality</th>
+                                            <th class="text-end">Present Count</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="row in stats.todayAttendanceByLocality" :key="row.locality">
+                                            <td>{{ row.locality || 'Not Specified' }}</td>
+                                            <td class="text-end fw-medium">{{ row.present_count }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <p v-else class="text-muted text-center small p-3 mb-0">No attendance data for localities on {{ formatDateForDisplay(selectedDate) }}.</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
       </div>
 
-      <div class="col-lg-5">
-        <div class="card shadow-sm h-100">
-          <div class="card-header bg-light py-2">
-            <h6 class="card-title d-flex align-items-center mb-0 small text-uppercase">
-              <Award class="me-2 text-warning" :size="18" /> Participants toujours présents
-            </h6>
-          </div>
-          <div class="card-body p-0" style="max-height: 280px; overflow-y: auto;">
-            <ul v-if="stats.perfectAttendance && stats.perfectAttendance.length > 0" class="list-group list-group-flush">
-               <li v-for="p in stats.perfectAttendance.slice(0, 7)" :key="p.id" class="list-group-item py-2 px-3 small">
-                {{ p.name }}
-                </li>
-            </ul>
-            <p v-else class="text-muted text-center small p-3 mb-0">Personne n’a encore assisté à toutes les séances.</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-12">
-        <div class="card shadow-sm">
-          <div class="card-header bg-light py-2">
-            <h6 class="card-title d-flex align-items-center mb-0 small text-uppercase">
-              <MapPin class="me-2 text-danger" :size="18" />
-              Présence par quartier ({{ formatDateForDisplay(selectedDate) }})
-            </h6>
-          </div>
-          <div class="card-body p-0">
-            <div v-if="stats.todayAttendanceByLocality && stats.todayAttendanceByLocality.length > 0" class="table-responsive">
-              <table class="table table-sm table-hover table-striped mb-0">
-                <thead class="table-light">
-                  <tr>
-                    <th>Quartier</th>
-                    <th class="text-end">Nombre de présents</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="row in stats.todayAttendanceByLocality" :key="row.locality">
-                    <td>{{ row.locality || 'Not Specified' }}</td>
-                    <td class="text-end fw-medium">{{ row.present_count }}</td>
-                  </tr>
-                </tbody>
-              </table>
+        <div class="modal fade" :class="{ 'show': showBaptismListModal, 'd-block': showBaptismListModal }" tabindex="-1" aria-labelledby="baptismModalLabel" :aria-hidden="!showBaptismListModal">
+            <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="baptismModalLabel">Participants Interested in Baptism</h5>
+                        <button type="button" class="btn-close" @click="showBaptismListModal = false" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div v-if="!stats.futureBaptisms || stats.futureBaptisms.length === 0" class="text-center text-muted p-3">
+                            No participants currently listed as interested in baptism.
+                        </div>
+                        <table v-else class="table table-striped table-hover table-sm">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="p in stats.futureBaptisms" :key="p.id">
+                                    <td>{{ p.id }}</td>
+                                    <td>{{ p.name }}</td>
+                                    </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary btn-sm" @click="showBaptismListModal = false">Close</button>
+                    </div>
+                </div>
             </div>
-            <p v-else class="text-muted text-center small p-3 mb-0">Pas de présence pour {{ formatDateForDisplay(selectedDate) }}.</p>
-          </div>
         </div>
-      </div>
+        <div v-if="showBaptismListModal" class="modal-backdrop fade show"></div>
     </div>
-    </div>
-
 </template>
 
 <style scoped>
 .dashboard-container {
-  /* max-width: 1600px; */
+  /* max-width: 1600px; */ /* If you want to constrain overall width */
 }
 .card {
   border: none;
-  /* border-radius: 0.375rem; */ /* Bootstrap default */
 }
 .card-header.bg-light {
-    background-color: #f8f9fa !important; /* Ensure light bg for headers */
+    background-color: #f8f9fa !important;
     border-bottom: 1px solid #e9ecef;
 }
 .card-title.small {
@@ -516,12 +538,11 @@ const formatDateForDisplay = (dateString) => {
 .list-group-item:last-child {
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
-    border-bottom:0; /* Remove last border if inside card-body p-0 */
+    border-bottom:0;
 }
 .border-start.border-4 {
     border-left-width: 4px !important;
 }
-/* Ensure chart containers have a defined height for maintainAspectRatio: false */
 canvas {
   width: 100% !important;
   height: 100% !important;
@@ -530,8 +551,18 @@ canvas {
     font-size: .75rem;
     margin-bottom: .25rem;
 }
-.modal-open {
+
+/* Modal specific styles if Bootstrap's default needs override */
+.modal.d-block { /* Ensure modal is displayed when showBaptismListModal is true */
+  display: block;
+}
+.modal-open { /* Prevent body scroll when modal is open */
   overflow: hidden;
 }
-
+.modal-backdrop.show { /* Ensure backdrop is visible */
+  opacity: 0.5;
+}
+.text-truncate {
+    max-width: 150px; /* Adjust as needed for your layout */
+}
 </style>
