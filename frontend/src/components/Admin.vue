@@ -2,7 +2,7 @@
   <div class="card w-100 shadow-sm h-100 d-flex flex-column">
     <div class="card-header bg-light p-3 flex-shrink-0">
       <h2 class="h5 mb-0 text-primary d-flex align-items-center">
-        <SettingsIcon class="me-2" :size="22" /> Admin Panel
+        <SettingsIcon class="me-2" :size="22" /> Panneau Administrateur
       </h2>
     </div>
 
@@ -11,34 +11,34 @@
       <div v-if="adminViewMode === 'list'">
         <div class="d-flex justify-content-between align-items-center mb-3">
           <h3 class="h6 mb-0 text-secondary d-flex align-items-center">
-            <UsersIcon class="me-2" :size="20" /> User Management
+            <UsersIcon class="me-2" :size="20" /> Gestion des Utilisateurs
           </h3>
           <button class="btn btn-success btn-sm d-flex align-items-center" @click="showAddUserForm">
-            <UserPlusIcon class="me-1" :size="16" /> New User
+            <UserPlusIcon class="me-1" :size="16" /> Ajouter un Utilisateur
           </button>
         </div>
 
         <div v-if="loading.users" class="text-center py-5">
           <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Loading users...</span>
+            <span class="visually-hidden">Chargement</span>
           </div>
-          <p class="mt-2 text-muted">Loading users...</p>
+          <p class="mt-2 text-muted">Chargement des Utilisateurs...</p>
         </div>
         <div v-else-if="error.users" class="alert alert-danger" role="alert">
           <AlertCircleIcon class="me-1" :size="16" /> {{ error.users }}
         </div>
         <div v-else-if="users.length === 0" class="text-center py-5 text-muted">
           <UsersIcon :size="48" class="mb-3 opacity-50" />
-          <p>No users found.</p>
+          <p>Aucun Utilisateurs trouvés</p>
         </div>
         <div v-else class="table-responsive">
-          <table class="table table-hover table-bordered table-sm align-middle">
+          <table class="table table-hover table-sm align-middle">
             <thead class="table-light">
               <tr>
                 <th scope="col">ID</th>
-                <th scope="col">Username</th>
-                <th scope="col">Role</th>
-                <!-- <th scope="col">Created At</th> -->
+                <th scope="col">Nom</th>
+                <th scope="col">Rôle</th>
+                <!-- <th scope="col">Créé le</th> -->
                 <th scope="col" class="text-end">Actions</th>
               </tr>
             </thead>
@@ -60,7 +60,7 @@
                       title="Edit User"
                       :disabled="saving.deleteUser || saving.editUser"
                     >
-                      <Edit3Icon class="me-1" :size="14" /> Edit
+                      <Edit3Icon class="me-1" :size="14" />
                     </button>
                     <button
                       class="btn btn-outline-danger d-flex align-items-center"
@@ -68,7 +68,7 @@
                       title="Delete User"
                       :disabled="saving.deleteUser || saving.editUser || user.id === loggedInUserId"
                     >
-                      <TrashIcon class="me-1" :size="14" /> Delete
+                      <TrashIcon class="me-1" :size="14" />
                     </button>
                   </div>
                 </td>
@@ -170,6 +170,7 @@
 
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue';
+import { useNotification } from "@kyvg/vue3-notification"; // Import vue-notification
 import {
     Settings as SettingsIcon,
     Users as UsersIcon,
@@ -178,8 +179,10 @@ import {
     AlertCircle as AlertCircleIcon,
     Save as SaveIcon,
     Edit3 as Edit3Icon,
-    ArrowLeft as ArrowLeftIcon // Added for back button
+    ArrowLeft as ArrowLeftIcon
 } from 'lucide-vue-next';
+
+const { notify } = useNotification(); // Destructure notify function
 
 const props = defineProps({
   apiCall: {
@@ -199,10 +202,10 @@ const saving = reactive({
     deleteUser: false,
     editUser: false,
 });
-const error = reactive({
+const error = reactive({ // These are for form-specific errors displayed in alert divs
   users: null,
   addUser: null,
-  deleteUser: null,
+  deleteUser: null, // This might be better handled by a notification directly
   editUser: null,
 });
 
@@ -213,7 +216,7 @@ const newUser = reactive({
   role: 'user',
 });
 
-const editingUser = ref(null); // Will hold { id, username, role }
+const editingUser = ref(null);
 
 const loggedInUserId = computed(() => {
     const token = localStorage.getItem('authToken');
@@ -238,7 +241,9 @@ const fetchUsers = async () => {
     users.value = await props.apiCall('/admin/users', 'GET');
   } catch (err) {
     console.error("Failed to fetch users:", err);
-    error.users = err.response?.data?.error || err.message || 'Failed to load users.';
+    const errorMessage = err.response?.data?.error || err.message || 'Failed to load users.';
+    error.users = errorMessage;
+    notify({ type: "error", title: "Error Fetching Users", text: errorMessage });
   } finally {
     loading.users = false;
   }
@@ -246,8 +251,7 @@ const fetchUsers = async () => {
 
 const showUserList = () => {
     adminViewMode.value = 'list';
-    editingUser.value = null; // Clear editing state
-    // Reset newUser form if needed, though it's reset when opening
+    editingUser.value = null;
     newUser.username = '';
     newUser.password = '';
     newUser.confirmPassword = '';
@@ -256,7 +260,6 @@ const showUserList = () => {
     error.editUser = null;
 };
 
-// --- Add User Logic ---
 const showAddUserForm = () => {
   newUser.username = '';
   newUser.password = '';
@@ -267,23 +270,28 @@ const showAddUserForm = () => {
 };
 
 const handleAddNewUser = async () => {
+  // Client-side validation
   if (!newUser.username.trim() || !newUser.password || !newUser.confirmPassword) {
     error.addUser = "All fields are required.";
+    notify({ type: "warn", title: "Validation Error", text: "All fields are required." });
     return;
   }
   if (newUser.password !== newUser.confirmPassword) {
     error.addUser = "Passwords do not match.";
+    notify({ type: "warn", title: "Validation Error", text: "Passwords do not match." });
     return;
   }
   if (newUser.password.length < 6) {
     error.addUser = "Password must be at least 6 characters long.";
+    notify({ type: "warn", title: "Validation Error", text: "Password must be at least 6 characters long." });
     return;
   }
   if (!['user', 'admin'].includes(newUser.role)) {
     error.addUser = "Invalid role selected.";
+     notify({ type: "warn", title: "Validation Error", text: "Invalid role selected." });
     return;
   }
-  error.addUser = null;
+  error.addUser = null; // Clear form-specific error display
   saving.addUser = true;
   try {
     await props.apiCall('/admin/users', 'POST', {
@@ -291,17 +299,19 @@ const handleAddNewUser = async () => {
       password: newUser.password,
       role: newUser.role,
     });
+    notify({ type: "success", title: "User Added", text: `User "${newUser.username}" created successfully.` });
     await fetchUsers();
-    showUserList(); // Go back to list after adding
+    showUserList();
   } catch (err) {
     console.error("Failed to add user:", err);
-    error.addUser = err.response?.data?.error || err.message || 'Failed to add user.';
+    const errorMessage = err.response?.data?.error || err.message || 'Failed to add user.';
+    error.addUser = errorMessage; // For display in the form's alert div
+    notify({ type: "error", title: "Add User Failed", text: errorMessage });
   } finally {
     saving.addUser = false;
   }
 };
 
-// --- Edit User Logic ---
 const showEditUserForm = (user) => {
   editingUser.value = { id: user.id, username: user.username, role: user.role };
   error.editUser = null;
@@ -309,66 +319,73 @@ const showEditUserForm = (user) => {
 };
 
 const handleUpdateUser = async () => {
+  // Client-side validation
   if (!editingUser.value || !editingUser.value.username.trim()) {
     error.editUser = "Username cannot be empty.";
+    notify({ type: "warn", title: "Validation Error", text: "Username cannot be empty." });
     return;
   }
   if (!['user', 'admin'].includes(editingUser.value.role)) {
     error.editUser = "Invalid role selected.";
+    notify({ type: "warn", title: "Validation Error", text: "Invalid role selected." });
     return;
   }
   if (editingUser.value.id === loggedInUserId.value && editingUser.value.role === 'user') {
       const currentUserData = users.value.find(u => u.id === loggedInUserId.value);
       const otherAdminsExist = users.value.some(u => u.role === 'admin' && u.id !== loggedInUserId.value);
       if (currentUserData?.role === 'admin' && !otherAdminsExist) {
-          error.editUser = "Cannot change the role of the only admin to 'user'.";
+          const demoteError = "Cannot change the role of the only admin to 'user'.";
+          error.editUser = demoteError;
+          notify({ type: "error", title: "Update User Failed", text: demoteError });
           return;
       }
   }
-  error.editUser = null;
+  error.editUser = null; // Clear form-specific error display
   saving.editUser = true;
   try {
     await props.apiCall(`/admin/users/${editingUser.value.id}`, 'PUT', {
       username: editingUser.value.username,
       role: editingUser.value.role,
     });
+    notify({ type: "success", title: "User Updated", text: `User "${editingUser.value.username}" updated successfully.` });
     await fetchUsers();
-    showUserList(); // Go back to list after updating
+    showUserList();
   } catch (err) {
     console.error("Failed to update user:", err);
-    error.editUser = err.response?.data?.error || err.message || 'Failed to update user.';
+    const errorMessage = err.response?.data?.error || err.message || 'Failed to update user.';
+    error.editUser = errorMessage; // For display in the form's alert div
+    notify({ type: "error", title: "Update User Failed", text: errorMessage });
   } finally {
     saving.editUser = false;
   }
 };
 
-// --- Delete User Logic ---
 const confirmDeleteUser = async (user) => {
   if (user.id === loggedInUserId.value) {
-    alert("You cannot delete your own account using this interface.");
+    notify({ type: "warn", title: "Action Denied", text: "You cannot delete your own account using this interface." });
     return;
   }
   if (window.confirm(`Are you sure you want to delete the user "${user.username}" (Role: ${user.role})? This action cannot be undone.`)) {
     saving.deleteUser = true;
-    error.deleteUser = null;
+    // error.deleteUser = null; // Not using a dedicated error display for this, using notification
     try {
       await props.apiCall(`/admin/users/${user.id}`, 'DELETE');
+      notify({ type: "success", title: "User Deleted", text: `User "${user.username}" deleted successfully.`});
       await fetchUsers();
-      // If current view was editing this deleted user, switch back to list
       if (adminViewMode.value === 'editUser' && editingUser.value?.id === user.id) {
         showUserList();
       }
     } catch (err) {
       console.error("Failed to delete user:", err);
-      error.deleteUser = err.response?.data?.error || err.message || `Failed to delete user ${user.username}.`;
-      alert(error.deleteUser);
+      const errorMessage = err.response?.data?.error || err.message || `Failed to delete user ${user.username}.`;
+      // Removed alert(error.deleteUser);
+      notify({ type: "error", title: "Delete User Failed", text: errorMessage });
     } finally {
       saving.deleteUser = false;
     }
   }
 };
 
-// --- Utility ---
 const formatDateForDisplay = (dateString) => {
   if (!dateString) return 'N/A';
   try {
@@ -390,10 +407,8 @@ onMounted(() => {
 
 <style scoped>
 .card.h-100 {
-  /* Ensures the card itself tries to take full height of its parent (.view-wrapper) */
 }
 .card-body {
-  /* flex-grow-1 and d-flex setup handles content filling and centering */
 }
 .card-header h2.h5 {
     margin-bottom: 0 !important;
@@ -422,7 +437,7 @@ onMounted(() => {
     background-color: var(--bs-secondary) !important;
 }
 .add-user-form-container, .edit-user-form-container {
-    max-width: 600px; /* Or your preferred max width for forms */
-    margin: 0 auto; /* Center the form */
+    max-width: 600px;
+    margin: 0 auto;
 }
 </style>

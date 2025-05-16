@@ -1,6 +1,7 @@
 <script setup>
 import { ref, watch } from 'vue';
 import { ShieldCheck, UserPlus, LogIn } from 'lucide-vue-next'; // Optional: for icons
+import logo from '../assets/impact.png'; // Import the logo
 
 // Props passed from App.vue
 const props = defineProps({
@@ -55,6 +56,9 @@ const requestRegistrationView = () => {
 <template>
   <div class="card shadow-sm">
     <div class="card-body p-4 p-md-5">
+      <div class="text-center mb-4">
+        <img :src="logo" alt="Logo" style="width: 100px; height: auto;">
+      </div>
       <h2 class="card-title text-center mb-4 fw-bold">
         Se Connecter
       </h2>

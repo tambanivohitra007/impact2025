@@ -15,7 +15,7 @@ const props = defineProps({
   },
   itemsPerPage: { // Added prop for items per page
     type: Number,
-    default: 5 // Default items per page
+    default: 10 // Default items per page
   }
 });
 
@@ -99,7 +99,11 @@ const handleBaptismToggle = async (participant) => {
   try {
     const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/participants/${participant.id}/baptism-interest`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        // Include the Authorization header with the token
+        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+      },
       body: JSON.stringify({ baptism_interest: newValue })
     });
 
@@ -113,7 +117,6 @@ const handleBaptismToggle = async (participant) => {
     alert("Erreur : " + err.message);
   }
 };
-
 
 
 </script>

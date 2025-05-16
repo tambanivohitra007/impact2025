@@ -1,0 +1,27 @@
+/* filepath: src/assets/styles/scrollbar.css */
+/* Custom Scrollbar (optional, for aesthetics) */
+::-webkit-scrollbar {
+    width: 6px;  /* Thinner scrollbar */
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05); /* Lighter track */
+}
+
+::-webkit-scrollbar-thumb {
+    background: #ced4da; /* Standard Bootstrap muted color */
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #adb5bd; /* Darken on hover */
+}
+
+/* Specific scrollbar for sidebar if needed */
+.sidebar .inner-sidebar-scroll::-webkit-scrollbar-thumb {
+    background: #e0e0e0;
+}
+.sidebar .inner-sidebar-scroll::-webkit-scrollbar-thumb:hover {
+    background: #c0c0c0;
+}

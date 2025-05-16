@@ -1,0 +1,66 @@
+/* filepath: src/assets/styles/sidebar.css */
+.sidebar {
+    background-color: #fff; /* Ensure sidebar has a background */
+}
+
+.sidebar .inner-sidebar-scroll {
+    /* Adjust height based on your header's actual rendered height */
+    /* For example, if header is 62px, and you want 1rem padding below it: */
+    height: calc(100vh - 62px - 1rem); /* (Viewport Height - Header Height - Top Padding) */
+    overflow-y: auto;
+    padding-top: 0.5rem; /* Padding for the content inside the scrollable area */
+}
+
+
+.sidebar .nav-link {
+    font-weight: 500;
+    color: #495057; /* Dark grey for text */
+    padding: 0.6rem 0.75rem;
+    border-radius: 0.3rem; /* Softer corners */
+    margin-bottom: 0.125rem; /* Small gap between items */
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.sidebar .nav-link .lucide {
+    color: var(--bs-primary); /* Icon color matches primary theme */
+    transition: color 0.15s ease;
+    margin-right: 0.65rem !important; /* Consistent spacing */
+}
+
+.sidebar .nav-link:hover {
+    background-color: #e9ecef; /* Light grey hover */
+    color: var(--bs-primary); /* Text color changes to primary on hover */
+}
+
+.sidebar .nav-link:hover .lucide {
+    color: var(--bs-primary);
+}
+
+.sidebar .nav-link.active {
+    background-image: linear-gradient(to right, var(--bs-primary), #20c997); /* Example: Primary to a teal */
+    color: white;
+    font-weight: 500; /* Or 600 for more emphasis */
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+}
+
+.sidebar .nav-link.active .lucide {
+    color: white; /* Icons in active link are white */
+}
+
+.offcanvas-start {
+    width: 280px; /* Standard mobile nav width */
+}
+
+.offcanvas-body .nav-link {
+    font-size: 1rem; /* Slightly larger for touch targets */
+    padding: 0.75rem 1rem;
+}
+
+.offcanvas-body .nav-link.active {
+    background-color: var(--bs-primary);
+    color: white;
+}
+
+.offcanvas-body .nav-link .lucide {
+    margin-right: 0.75rem;
+}

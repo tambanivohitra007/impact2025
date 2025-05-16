@@ -1,0 +1,47 @@
+/* filepath: src/assets/styles/app.css */
+html,
+body {
+    height: 100%;
+    margin: 0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background-color: #f0f2f5;
+}
+
+#app {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.app-wrapper {
+    min-height: 100vh;
+}
+
+.main-content-area {
+    overflow-y: auto;
+    background-color: #f0f2f5;
+}
+
+.view-wrapper {
+    /* This wrapper inside main-content-area now holds the padding */
+}
+
+/* Ensure that flex children of view-wrapper can scroll if they overflow */
+.view-wrapper.d-flex.flex-column > .flex-grow-1 {
+    overflow-y: auto; /* Allow this specific child to scroll */
+    min-height: 0; /* Important for flex children to scroll correctly */
+}
+
+.toast-container {
+    z-index: 1100 !important; /* Ensure toasts are on top */
+}
+
+.toast.show {
+    display: block !important; /* Override Bootstrap's default if necessary */
+}
+
+.app-footer {
+    font-size: 0.8rem;
+    background-color: #ffffff; /* Match sidebar/header parts for consistency */
+    border-top: 1px solid #dee2e6; /* Standard Bootstrap border color */
+}

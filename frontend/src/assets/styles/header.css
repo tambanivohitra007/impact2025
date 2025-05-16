@@ -1,0 +1,25 @@
+/* filepath: src/assets/styles/header.css */
+.app-header {
+    background: linear-gradient(to right, var(--bs-primary, #0d6efd), var(--bs-primary-dark, #0a58ca));
+    padding-top: 0.75rem !important;
+    padding-bottom: 0.75rem !important;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.app-header .app-title,
+.app-header .app-title-mobile {
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.app-header .mobile-nav-toggle {
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background-color: transparent;
+    transition: background-color 0.2s ease;
+}
+
+.app-header .mobile-nav-toggle:hover,
+.app-header .mobile-nav-toggle:focus {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.7);
+}

@@ -1,0 +1,10 @@
+/* filepath: src/assets/styles/global.css */
+.global-alert {
+    z-index: 1056; /* Above most Bootstrap components but below modals (1060+) */
+    position: sticky;
+    top: 0; /* Stick to top of viewport */
+}
+/* If header is also sticky, adjust top for global-alert */
+.app-header.sticky-top ~ .global-alert { /* This selector might need adjustment based on actual DOM structure */
+    top: 62px; /* Adjust based on actual header height */
+}
