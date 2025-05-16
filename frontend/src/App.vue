@@ -356,9 +356,9 @@ const handleLogout = async (isAutoLogout = false) => {
         <div v-if="!loggedIn" class="d-flex flex-column justify-content-center align-items-center min-vh-100 p-3">
             <div class="auth-form-container" style="max-width: 400px; width: 100%;">
                 <div class="text-center mb-4">
-                    <img :src="logo" alt="Logo" style="width: 80px; height: 80px; margin-bottom: 1rem;" />
+                    <img :src="logo" alt="Logo" style="width: 120px; height: 120px; margin-bottom: 1rem;" />
                     <h1 class="h3 mb-1 fw-bold app-title">IMPACT 2025</h1>
-                    <p class="mb-0 text-muted" style="line-height: 1.2;">Ho avy indray i Jesosy</p>
+                    <p class="mb-0 text-muted" style="line-height: 1.2;">Eglise Mahabo</p>
                 </div>
                 <LoginView
                     v-if="!showRegistration"

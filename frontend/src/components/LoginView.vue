@@ -57,7 +57,7 @@ const requestRegistrationView = () => {
   <div class="card shadow-sm">
     <div class="card-body p-4 p-md-5">
       <div class="text-center mb-4">
-        <img :src="logo" alt="Logo" style="width: 100px; height: auto;">
+        <!-- <img :src="logo" alt="Logo" style="width: 100px; height: auto;"> -->
       </div>
       <h2 class="card-title text-center mb-4 fw-bold">
         Se Connecter
@@ -75,7 +75,7 @@ const requestRegistrationView = () => {
           <label for="loginUsername" class="form-label">Utilisateur</label>
           <input
             type="text"
-            class="form-control form-control-lg"
+            class="form-control form-control-md"
             id="loginUsername"
             v-model="username"
             placeholder="Enter your username"
@@ -88,7 +88,7 @@ const requestRegistrationView = () => {
           <label for="loginPassword" class="form-label">Mot de passe</label>
           <input
             type="password"
-            class="form-control form-control-lg"
+            class="form-control form-control-md"
             id="loginPassword"
             v-model="password"
             placeholder="Enter your password"
@@ -100,7 +100,7 @@ const requestRegistrationView = () => {
         <div class="d-grid gap-2 mb-3">
           <button
             type="submit"
-            class="btn btn-primary btn-lg d-flex align-items-center justify-content-center"
+            class="btn btn-primary btn-md d-flex align-items-center justify-content-center"
             :disabled="props.loading"
           >
             <span v-if="props.loading" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>

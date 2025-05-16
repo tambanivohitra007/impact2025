@@ -61,7 +61,7 @@ const handleCancelRegistration = () => {
   <div class="card shadow-sm">
     <div class="card-body p-4 p-md-5">
       <h2 class="card-title text-center mb-4 fw-bold">
-        <UserPlus :size="32" class="me-2 text-primary" /> Register
+        <UserPlus :size="32" class="me-2 text-primary" /> S'inscrire
       </h2>
 
       <div v-if="props.externalErrorMessage" class="alert alert-danger py-2 small mb-3" role="alert">
@@ -73,39 +73,39 @@ const handleCancelRegistration = () => {
 
       <form @submit.prevent="handleSubmitRegistration">
         <div class="mb-3">
-          <label for="registerUsername" class="form-label">Username</label>
+          <label for="registerUsername" class="form-label">Nom</label>
           <input
             type="text"
-            class="form-control form-control-lg"
+            class="form-control form-control-md"
             id="registerUsername"
             v-model="username"
-            placeholder="Choose a username"
+            placeholder="Choisissez un nom d'utilisateur"
             required
             :disabled="props.loading"
           />
         </div>
 
         <div class="mb-3">
-          <label for="registerPassword" class="form-label">Password</label>
+          <label for="registerPassword" class="form-label">Mot de Passe</label>
           <input
             type="password"
-            class="form-control form-control-lg"
+            class="form-control form-control-md"
             id="registerPassword"
             v-model="password"
-            placeholder="Create a password (min. 6 characters)"
+            placeholder="Mot de passe d'au moins 6 caractères"
             required
             :disabled="props.loading"
           />
         </div>
 
         <div class="mb-3">
-          <label for="confirmPassword" class="form-label">Confirm Password</label>
+          <label for="confirmPassword" class="form-label">Confirmation</label>
           <input
             type="password"
-            class="form-control form-control-lg"
+            class="form-control form-control-md"
             id="confirmPassword"
             v-model="confirmPassword"
-            placeholder="Confirm your password"
+            placeholder="Confirmer votre mot de passe"
             required
             :disabled="props.loading"
           />
@@ -114,7 +114,7 @@ const handleCancelRegistration = () => {
         <div class="d-grid gap-2 mb-3">
           <button
             type="submit"
-            class="btn btn-success btn-lg d-flex align-items-center justify-content-center"
+            class="btn btn-success btn-md d-flex align-items-center justify-content-center"
             :disabled="props.loading"
           >
             <span v-if="props.loading" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
@@ -123,7 +123,7 @@ const handleCancelRegistration = () => {
           </button>
           <button
             type="button"
-            class="btn btn-outline-secondary btn-lg d-flex align-items-center justify-content-center"
+            class="btn btn-outline-secondary btn-md d-flex align-items-center justify-content-center"
             @click="handleCancelRegistration"
             :disabled="props.loading"
           >
@@ -134,14 +134,14 @@ const handleCancelRegistration = () => {
       </form>
        <div class="text-center mt-2">
         <p class="mb-0">
-          Already have an account?
+          Avez-vous déjà un compte?
           <button
             type="button"
             class="btn btn-link p-0 align-baseline"
             @click="handleCancelRegistration"
             :disabled="props.loading"
           >
-             Login here
+             Se connecter Ici
           </button>
         </p>
       </div>
