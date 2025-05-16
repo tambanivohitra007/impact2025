@@ -88,7 +88,7 @@ defineExpose({
     </div>
 
     <div class="mb-3">
-      <label for="session-form-date" class="form-label">Session Date <span class="text-danger">*</span></label>
+      <label for="session-form-date" class="form-label">Date de la Session<span class="text-danger">*</span></label>
       <input
         id="session-form-date"
         type="date"
@@ -101,7 +101,7 @@ defineExpose({
     </div>
 
     <div class="mb-3">
-      <label for="session-form-topic" class="form-label">Topic (Optional)</label>
+      <label for="session-form-topic" class="form-label">Topic</label>
       <input
         id="session-form-topic"
         v-model="formData.topic"
@@ -115,7 +115,7 @@ defineExpose({
 
   </form>
 </template>
-// ...existing code...
+
 <style scoped>
 /* Add component-specific styles if necessary */
 .form-label {

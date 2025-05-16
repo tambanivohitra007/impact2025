@@ -1,6 +1,6 @@
 <script setup>
-import { ref, computed, watch } from 'vue';
-import { UserCheck, ChevronLeft, Save, Trash2, Search, AlertCircle, CheckSquare, Square } from 'lucide-vue-next';
+import { ref, reactive, computed, watch, onMounted } from 'vue';
+import { UserCheck, ChevronLeft, Save, Trash2, Search, AlertCircle, CheckSquare, Square } from 'lucide-vue-next'; // Import necessary icons
 
 // --- Props ---
 const props = defineProps({
@@ -13,12 +13,17 @@ const props = defineProps({
     required: true,
     default: () => []
   },
-  initialAttendance: { // This will be the processed list from App.vue
+  sessions: { // session attendance
     type: Array,
     required: true,
     default: () => []
   },
-  loading: {
+  initialAttendance: { // Attendance records specifically for this session, passed from parent
+    type: Array,
+    required: true,
+    default: () => []
+  },
+  loading: { // Loading state for fetching attendance
     type: Boolean,
     default: false
   },
@@ -30,16 +35,25 @@ const props = defineProps({
 
 // --- Emits ---
 const emit = defineEmits([
-  'back',
-  'save-attendance',
-  'delete-session',
+  'back',             // Signal to go back to the session list
+  'save-attendance',  // Send updated attendance data to parent
+  'delete-session',   // Request parent to delete the current session
+  'refresh-attendance' // Request parent to re-fetch attendance data (optional)
 ]);
 
 // --- State ---
 const localAttendance = ref([]);
-const searchTerm = ref('');
+// Search term for filtering participants in the list
+const searchQuery = ref('');
+// State for showing save confirmation message
 const showSaveConfirmation = ref(false);
-const componentError = ref(null); // For errors specific to this component's actions
+// State for potential errors specific to this component (e.g., if saving fails)
+const componentError = ref(null);
+
+const attendanceSummaryMap = ref({});
+const totalSessions = ref (0);
+
+const hasUnsavedChanges = ref(false);
 
 // --- Helper Functions ---
 const formatDate = (dateString) => {
@@ -48,34 +62,59 @@ const formatDate = (dateString) => {
         const date = new Date(dateString);
         const offset = date.getTimezoneOffset() * 60000;
         const adjustedDate = new Date(date.getTime() + offset);
-        return adjustedDate.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+        return adjustedDate.toLocaleDateString('en-CA');
     } catch (e) { return 'Invalid Date'; }
 };
 
+const isPastSession = computed(() => {
+  if (!props.session?.session_date) return false;
+  const today = new Date().toISOString().split('T')[0];
+  return props.session.session_date < today;
+});
+
+
 // --- Watchers ---
 watch(() => props.initialAttendance, (newAttendanceData) => {
-  // Create a deep copy to ensure localAttendance is mutable and independent
+  // Create a deep copy to avoid modifying the prop directly
   localAttendance.value = JSON.parse(JSON.stringify(newAttendanceData));
-  // Sort alphabetically by participant name for consistent display
-  localAttendance.value.sort((a, b) => {
-      if (a.participant_name && b.participant_name) {
-          return a.participant_name.localeCompare(b.participant_name);
-      }
-      return 0; // Fallback if names are missing
-  });
-}, { immediate: true, deep: true });
+  // Sort alphabetically by participant name
+  localAttendance.value.sort((a, b) => a.participant_name.localeCompare(b.participant_name));
+}, { immediate: true, deep: true }); // immediate: run on mount, deep: watch for nested changes
 
 // --- Computed Properties ---
 const filteredAttendance = computed(() => {
-  if (!searchTerm.value) {
+  if (!searchQuery.value) {
     return localAttendance.value;
   }
-  const lowerSearch = searchTerm.value.toLowerCase();
+  const query = searchQuery.value.toLowerCase();
   return localAttendance.value.filter(att =>
-    att.participant_name && att.participant_name.toLowerCase().includes(lowerSearch)
+    att.participant_name.toLowerCase().includes(query) ||
+    att.participant_id.toString().includes(query)
   );
 });
 
+const fetchAttendanceSummary = async () => {
+  try {
+    const response = await fetch('http://localhost:3001/api/participants/attendance-summary');
+    if (!response.ok) throw new Error('Erreur de chargement du résumé de présence');
+
+    const data = await response.json();
+
+    const map = {};
+    data.forEach(entry => {
+      map[entry.id] = entry.attended_sessions;
+    });
+
+    attendanceSummaryMap.value = map;
+    totalSessions.value = data.length > 0 ? data[0].total : 0;
+    console.log(data);
+
+  } catch (err) {
+    console.error("Erreur fetchAttendanceSummary:", err);
+  }
+};
+
+// Calculate attendance counts
 const attendanceCount = computed(() => {
   const attended = localAttendance.value.filter(a => a.attended).length;
   const total = localAttendance.value.length;
@@ -86,11 +125,19 @@ const attendanceCount = computed(() => {
 const handleAttendanceChange = (participantId, isChecked) => {
   const record = localAttendance.value.find(att => att.participant_id === participantId);
   if (record) {
+    if (record.attended !== isChecked) {
+      hasUnsavedChanges.value = true;
+    }
     record.attended = isChecked;
+    hasUnsavedChanges.value = true;
   }
 };
 
 const goBack = () => {
+  // if (hasUnsavedChanges.value) {
+  //   const confirmed = window.confirm("Vous avez des modifications non enregistrées. Voulez-vous vraiment quitter sans enregistrer ?");
+  //   if (!confirmed) return;
+  // }
   emit('back');
 };
 
@@ -100,8 +147,9 @@ const saveAttendance = async () => {
     if (errorMsg) {
         componentError.value = errorMsg;
     } else {
-        showSaveConfirmation.value = true;
-        setTimeout(() => { showSaveConfirmation.value = false; }, 3000);
+        hasUnsavedChanges.value = false;
+        showSaveConfirmation.value = true; // Show success confirmation
+        setTimeout(() => { showSaveConfirmation.value = false; }, 3000); // Hide after 3s
     }
 };
 
@@ -109,23 +157,39 @@ const requestDeleteSession = () => {
   emit('delete-session', props.session.id);
 };
 
-// Toggle all participants' attendance
-const toggleSelectAll = () => {
-    const allCurrentlySelected = filteredAttendance.value.length > 0 && filteredAttendance.value.every(p => p.attended);
-    const newAttendedState = !allCurrentlySelected;
-    filteredAttendance.value.forEach(p => {
-        // Ensure we modify the original record in localAttendance if filteredAttendance is a subset
-        const originalRecord = localAttendance.value.find(orig => orig.participant_id === p.participant_id);
-        if (originalRecord) {
-            originalRecord.attended = newAttendedState;
-        }
-    });
+// Filter participants based on search query
+const filterParticipants = () => {
+    if (!searchQuery.value) {
+        localAttendance.value = props.initialAttendance;
+        return;
+    }
+
+    const query = searchQuery.value.toLowerCase();
+    localAttendance.value = props.initialAttendance.filter(record => 
+        record.participant_name.toLowerCase().includes(query) ||
+        record.participant_id.toString().includes(query)
+    );
 };
 
-const isAllSelected = computed(() => {
-    return filteredAttendance.value.length > 0 && filteredAttendance.value.every(p => p.attended);
+
+// Initialize filtered attendance
+onMounted(async () => {
+  localAttendance.value = props.initialAttendance;
+  filterParticipants();
+  await fetchAttendanceSummary(); // 👈 ajout ici
 });
 
+defineExpose({
+  hasUnsavedChanges,
+  saveAttendance,
+});
+
+
+// Watch for changes in attendance
+watch(() => props.initialAttendance, (newAttendance) => {
+    localAttendance.value = newAttendance;
+    filterParticipants();
+}, { deep: true });
 
 </script>
 
@@ -158,8 +222,8 @@ const isAllSelected = computed(() => {
         <input
           type="search"
           class="form-control border-start-0"
-          placeholder="Search participants..."
-          v-model="searchTerm"
+          placeholder="Rechercher par nom ou ID..."
+          v-model="searchQuery"
           aria-label="Search participants in attendance list"
         >
       </div>
@@ -177,55 +241,43 @@ const isAllSelected = computed(() => {
         <p class="mt-2 mb-0">Loading attendance...</p>
       </div>
 
-      <div v-else-if="!localAttendance.length && !loading" class="text-center p-5 text-muted">
-         <Users :size="48" class="mb-2" />
-         <p class="mb-1 fw-bold">No participants found.</p>
-         <p class="small">There might be no participants in the system, or none loaded for this session.</p>
-      </div>
-
-      <div v-else class="list-group list-group-flush">
-        <div v-if="filteredAttendance.length > 0" class="list-group-item px-3 py-2 bg-light-subtle">
-            <div class="form-check">
-                <input
+      <div v-else class="table-responsive" style="max-height: 55vh; overflow-y: auto;">
+        <table class="table table-hover mb-0">
+          <thead class="table-light" style="position: sticky; top: 0; z-index: 1;">
+            <tr>
+              <th scope="col" class="text-center" style="width: 80px;">Attended</th>
+              <th scope="col">ID</th>
+              <th scope="col">Nom</th>
+              <th scope="col">Sessions assistées</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="!loading && filteredAttendance.length === 0">
+              <td colspan="3" class="text-center text-muted py-4">
+                {{ searchQuery ? 'No participants found matching search.' : (participants.length === 0 ? 'No participants exist in the system.' : 'No attendance records found.') }}
+              </td>
+            </tr>
+            <tr v-for="att in filteredAttendance" :key="att.participant_id">
+              <td class="text-center align-middle">
+                <div class="form-check d-flex justify-content-center">
+                  <input
                     class="form-check-input"
                     type="checkbox"
-                    id="selectAllCheckbox"
-                    :checked="isAllSelected"
-                    @change="toggleSelectAll"
-                    :disabled="saving"
-                >
-                <label class="form-check-label fw-medium small" for="selectAllCheckbox">
-                    {{ isAllSelected ? 'Deselect All Shown' : 'Select All Shown' }} ({{ filteredAttendance.length }})
-                </label>
-            </div>
-        </div>
-
-        <div
-            v-for="att in filteredAttendance"
-            :key="att.participant_id"
-            class="list-group-item px-3 py-2"
-            role="button"
-            @click="!saving && handleAttendanceChange(att.participant_id, !att.attended)"
-            :class="{ 'list-group-item-success': att.attended, 'disabled-interaction': saving }"
-            style="cursor: pointer;"
-        >
-          <div class="d-flex justify-content-between align-items-center">
-            <span class="text-truncate me-2">{{ att.participant_name }}</span>
-            <div @click.stop> <input
-                    class="form-check-input visually-hidden"
-                    type="checkbox"
-                    :id="'att-check-' + att.participant_id"
+                    :id="'att-' + att.participant_id"
                     :checked="att.attended"
                     @change="handleAttendanceChange(att.participant_id, $event.target.checked)"
-                    :disabled="saving"
-                >
-                 <label :for="'att-check-' + att.participant_id" class="custom-checkbox-display" role="button" :aria-label="'Mark ' + att.participant_name + (att.attended ? ' as not attended' : ' as attended')">
-                    <CheckSquare v-if="att.attended" :size="22" class="text-success" />
-                    <Square v-else :size="22" class="text-muted" />
-                </label>
-            </div>
-          </div>
-           </div>
+                    :disabled="saving || isPastSession"  
+                  >
+                </div>
+              </td>
+              <td class="align-middle">{{ att.participant_id }}</td>
+              <td class="align-middle">{{ att.participant_name }}</td>
+              <td class="align-middle">
+                {{ attendanceSummaryMap[att.participant_id] || 0 }} / {{ totalSessions }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
@@ -244,6 +296,15 @@ const isAllSelected = computed(() => {
 </template>
 
 <style scoped>
+/* Scoped styles for AttendanceTracker component */
+.table th {
+    font-weight: 500;
+}
+.table td, .table th {
+    vertical-align: middle;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+}
 .list-group-item {
     transition: background-color 0.15s ease-in-out;
 }

@@ -50,7 +50,7 @@ const formatDate = (dateString) => {
         return adjustedDate.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
     } catch (e) {
         console.error("Error formatting date:", dateString, e);
-        return 'Invalid Date';
+        return 'Date invalide';
     }
 };
 
@@ -84,7 +84,7 @@ const goToPage = (page) => {
           <span class="badge bg-danger ms-2">{{ sessions.length }}</span>
         </h2>
         <button @click="handleAddNewSessionClick" class="btn btn-primary btn-sm d-flex align-items-center mt-2">
-            <PlusCircle class="me-1" :size="16" /> Add Session
+            <PlusCircle class="me-1" :size="16" /> Ajouter Session
         </button>
       </div>      
     </div>
@@ -94,13 +94,13 @@ const goToPage = (page) => {
         <div class="spinner-border text-primary" role="status">
             <span class="visually-hidden">Loading...</span>
         </div>
-        <p class="mt-2 mb-0">Loading sessions...</p>
+        <p class="mt-2 mb-0">Chargement sessions...</p>
       </div>
 
       <div v-else-if="!sessions.length" class="text-center p-5 text-muted d-flex flex-column justify-content-center align-items-center h-100">
         <Calendar :size="48" class="mb-2" />
-        <p class="mb-1 fw-bold">No sessions recorded yet.</p>
-        <p class="small">Click "Add Session" to create one.</p>
+        <p class="mb-1 fw-bold">Pas de sessions enregistrées</p>
+        <p class="small">Click "Ajouter Session" pour en crée une</p>
       </div>
 
       <div v-else class="list-group list-group-flush">
@@ -126,7 +126,7 @@ const goToPage = (page) => {
                 >
                   <UserCheck :size="16" class="me-1 d-none d-sm-inline-block" />
                   <span class="d-sm-none"><UserCheck :size="18" /></span>
-                  <span class="d-none d-sm-inline">Attendance</span>
+                  <span class="d-none d-sm-inline">Présence</span>
                 </button>
                 <button
                   @click="handleDeleteSessionClick(s.id)"
@@ -149,7 +149,7 @@ const goToPage = (page) => {
         :disabled="currentPage === 1"
         class="btn btn-sm btn-outline-secondary"
       >
-        Previous
+        Précédent
       </button>
       <span>Page {{ currentPage }} of {{ totalPages }}</span>
       <button
@@ -157,7 +157,7 @@ const goToPage = (page) => {
         :disabled="currentPage === totalPages"
         class="btn btn-sm btn-outline-secondary"
       >
-        Next
+        Suivant
       </button>
     </div>
   </div>

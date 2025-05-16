@@ -26,6 +26,7 @@ const formData = reactive({
   locality: '',
   date_joined: '',
   referred_by_participant_id: '',
+  joining_reason: '',
 });
 const formError = ref('');
 
@@ -45,6 +46,29 @@ const formatDateForInput = (dateString) => {
 
 const todayDateString = () => new Date().toLocaleDateString('en-CA');
 
+const showCustomLocality = ref(false);
+const customLocality = ref('');
+const referrerName = ref('');
+const referrerNotFound = ref(false);
+
+// Watch le champ ID pour rechercher le nom automatiquement
+watch(() => formData.referred_by_participant_id, (newId) => {
+  if (!newId) {
+    referrerName.value = '';
+    referrerNotFound.value = false;
+    return;
+  }
+
+  const referrer = props.participants.find(p => p.id === Number(newId));
+  if (referrer) {
+    referrerName.value = referrer.name;
+    referrerNotFound.value = false;
+  } else {
+    referrerName.value = '';
+    referrerNotFound.value = true;
+  }
+});
+
 const resetForm = (participant) => {
   formData.id = participant?.id || null;
   formData.name = participant?.name || '';
@@ -53,8 +77,11 @@ const resetForm = (participant) => {
   formData.gender = participant?.gender || '';
   formData.main_address = participant?.main_address || '';
   formData.locality = participant?.locality || '';
+  showCustomLocality.value = !['Mahabo', 'Andoharanofotsy', 'Manandona', 'Iavoloha','Ambohimanambola', 'Volotara'].includes(formData.locality);
+  customLocality.value = showCustomLocality.value ? formData.locality : '';
   formData.date_joined = formatDateForInput(participant?.date_joined) || todayDateString();
   formData.referred_by_participant_id = participant?.referred_by_participant_id || '';
+  formData.joining_reason = participant?.joining_reason || '';
   formError.value = '';
 };
 
@@ -95,16 +122,20 @@ const submit = async () => {
     age: formData.age ? parseInt(formData.age) : null,
     gender: formData.gender || null,
     main_address: formData.main_address?.trim() || null,
-    locality: formData.locality?.trim() || null,
+    locality: showCustomLocality.value ? customLocality.value.trim() : formData.locality.trim(),
     date_joined: formData.date_joined,
     referred_by_participant_id: formData.referred_by_participant_id
                                   ? parseInt(formData.referred_by_participant_id, 10)
                                   : null,
+    joining_reason: formData.joining_reason || null
   };
 
   const apiError = await emit('save', dataToSave);
   if (apiError) {
     formError.value = apiError;
+  } else {
+    // Reset form after successful save
+    resetForm(null);
   }
 };
 
@@ -123,7 +154,7 @@ defineExpose({
 
     <div class="row g-3">
       <div class="col-12">
-        <label for="part-form-name" class="form-label">Name <span class="text-danger">*</span></label>
+        <label for="part-form-name" class="form-label">Nom<span class="text-danger">*</span></label>
         <input
           id="part-form-name"
           v-model="formData.name"
@@ -135,7 +166,7 @@ defineExpose({
       </div>
 
       <div class="col-md-6">
-        <label for="part-form-contact" class="form-label">Contact Info</label>
+        <label for="part-form-contact" class="form-label">Contact</label>
         <input
           id="part-form-contact"
           v-model="formData.contact_info"
@@ -159,21 +190,21 @@ defineExpose({
       </div>
 
       <div class="col-md-3 col-6">
-        <label for="part-form-gender" class="form-label">Gender</label>
+        <label for="part-form-gender" class="form-label">Genre</label>
         <select
           id="part-form-gender"
           v-model="formData.gender"
           class="form-select form-select-sm"
           :disabled="saving"
         >
-          <option value="">Select...</option>
-          <option value="M">Male</option>
-          <option value="F">Female</option>
+          <option value="">Selectionner</option>
+          <option value="M">Masculin</option>
+          <option value="F">Feminin</option>
         </select>
       </div>
 
       <div class="col-12">
-        <label for="part-form-address" class="form-label">Main Address</label>
+        <label for="part-form-address" class="form-label">Adresse</label>
         <input
           id="part-form-address"
           v-model="formData.main_address"
@@ -184,18 +215,39 @@ defineExpose({
       </div>
 
       <div class="col-md-6">
-        <label for="part-form-locality" class="form-label">Locality/District</label>
-        <input
+        <label for="part-form-locality" class="form-label">Quartier</label>
+        <select
           id="part-form-locality"
           v-model="formData.locality"
+          @change="showCustomLocality = formData.locality === 'Autre'"
+          class="form-select form-select-sm"
+          :disabled="saving"
+        >
+          <option value="">-- Sélectionner un quartier --</option>
+          <option value="Mahabo">Mahabo</option>
+          <option value="Andoharanofotsy">Andoharanofotsy</option>
+          <option value="Manandona">Manandona</option>
+          <option value="Iavoloha">Iavoloha</option>
+          <option value="Iavoloha">Volotara</option>
+          <option value="Iavoloha">Ambohimanambola</option>
+          <option value="Autre">Autre</option>
+        </select>
+      </div>
+
+      <div class="mb-3" v-if="showCustomLocality">
+        <label for="custom-locality" class="form-label">Nom du quartier</label>
+        <input
+          id="custom-locality"
+          v-model="customLocality"
           type="text"
           class="form-control form-control-sm"
           :disabled="saving"
+          placeholder="Entrer le nom du quartier"
         >
       </div>
 
       <div class="col-md-6">
-        <label for="part-form-joined" class="form-label">Date Joined <span class="text-danger">*</span></label>
+        <label for="part-form-joined" class="form-label">Date d'inscription <span class="text-danger">*</span></label>
         <input
           id="part-form-joined"
           type="date"
@@ -207,17 +259,38 @@ defineExpose({
       </div>
 
       <div class="col-12">
-        <label for="part-form-referrer" class="form-label">Referred By</label>
-        <select
+        <label for="part-form-referrer" class="form-label">ID du parrain</label>
+        <input
           id="part-form-referrer"
           v-model="formData.referred_by_participant_id"
+          type="number"
+          class="form-control form-control-sm"
+          :disabled="saving"
+          placeholder="Entrer l'ID du parrain"
+        />
+        <small class="text-muted" v-if="referrerName">
+          Recommandé par : <strong>{{ referrerName }}</strong>
+        </small>
+        <small class="text-danger" v-if="referrerNotFound">
+          Aucun participant trouvé avec cet ID
+        </small>
+      </div>
+
+      <div class="col-md-6">
+        <label for="joining_reason" class="form-label">Motif d'inscription</label>
+        <select
+          id="joining_reason"
+          v-model="formData.joining_reason"
           class="form-select form-select-sm"
           :disabled="saving"
         >
-          <option value="">-- None --</option>
-          <option v-for="p in availableReferrers" :key="p.id" :value="p.id">
-            {{ p.name }}
-          </option>
+          <option value="">-- Sélectionner un motif --</option>
+          <option value="Tracte">Tracte</option>
+          <option value="Affiche">Affiche</option>
+          <option value="Amis/Famille">Amis / Famille</option>
+          <option value="Radio">Radio</option>
+          <option value="Social media">Réseaux sociaux</option>
+          <option value="Autres">Autres</option>
         </select>
       </div>
     </div>
