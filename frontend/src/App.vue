@@ -111,6 +111,18 @@ async function apiCall(url, method = 'GET', body = null) {
 
     try {
         const response = await fetch(`${API_BASE_URL}${url}`, options);
+
+        if (response.status === 401) {
+            // Token expired or invalid
+            localStorage.removeItem('authToken');
+            loggedIn.value = false;
+            currentUserRole.value = null;
+            view.value = 'login';
+            showRegistration.value = false;
+            error.value = 'Session expired. Please log in again.';
+            return;
+        }
+        
         const data = await response.json();
         if (!response.ok) {
             const errorMessageContent = data?.error || data?.message || `API Error: ${response.status} ${response.statusText}`;
@@ -264,20 +276,134 @@ const handleNavigation = async (newView) => {
 };
 
 // --- Participant Actions ---
-const handleAddParticipantRequest = () => { /* ... */ };
-const handleEditParticipantRequest = (participant) => { /* ... */ };
-const handleSaveParticipant = async (participantData) => { /* ... */ };
-const handleDeleteParticipant = async (participantId) => { /* ... */ };
+const handleAddParticipantRequest = () => {
+    editingParticipant.value = null;
+    showParticipantModal.value = true;
+};
+const handleEditParticipantRequest = (participant) => {
+    editingParticipant.value = participant;
+    showParticipantModal.value = true;
+};
+
+const handleSaveParticipant = async (participantData) => {
+    let apiError = null;
+    try {
+        let savedParticipant;
+        if (editingParticipant.value?.id) {
+            savedParticipant = await apiCall(`/participants/${editingParticipant.value.id}`, 'PUT', participantData);
+             successNotification.value = { show: true, message: `Participant "${participantData.name}" updated.`, details: '' };
+        } else {
+            savedParticipant = await apiCall('/participants', 'POST', participantData);
+            successNotification.value = { show: true, message: `Participant "${savedParticipant.name}" created.`, details: `ID: ${savedParticipant.id}` };
+        }
+        showParticipantModal.value = false; await fetchParticipants();
+    } catch (err) { apiError = error.value; }
+    finally { setTimeout(() => successNotification.value.show = false, 4000); }
+    return apiError;
+};
+const handleDeleteParticipant = async (participantId) => {
+    const pToDelete = participants.value.find(p => p.id === participantId);
+    if (window.confirm(`Delete "${pToDelete?.name || 'this participant'}"?`)) {
+        try {
+            await apiCall(`/participants/${participantId}`, 'DELETE');
+            successNotification.value = { show: true, message: `Participant "${pToDelete?.name || 'ID: '+participantId}" deleted.`, details: '' };
+            await fetchParticipants();
+            if (view.value === 'attendance' && selectedSession.value) await fetchAttendanceForSession(selectedSession.value.id);
+        } catch (err) { /* Handled */ }
+        finally { setTimeout(() => successNotification.value.show = false, 4000); }
+    }
+};
 
 // --- Session Actions ---
-const handleAddSessionRequest = () => { /* ... */ };
-const handleSaveSession = async (sessionData) => { /* ... */ };
-const handleDeleteSession = async (sessionId) => { /* ... */ };
+const handleAddSessionRequest = () => {
+    showSessionModal.value = true;
+};
 
-// --- Attendance Actions ---
-const handleViewAttendance = async (session) => { /* ... */ };
-const handleBackToSessions = async () => { /* ... */ };
-const handleSaveAttendance = async (attendanceData) => { /* ... */ };
+const handleSaveSession = async (sessionData) => {
+    let apiError = null;
+    try {
+        await apiCall('/sessions', 'POST', sessionData);
+        successNotification.value = { show: true, message: `Session for ${formatDateForDisplay(sessionData.session_date)} added.`, details: '' };
+        showSessionModal.value = false; await fetchSessions();
+    } catch (err) { apiError = error.value; }
+    finally { setTimeout(() => successNotification.value.show = false, 4000); }
+    return apiError;
+};
+const handleDeleteSession = async (sessionId) => {
+    const sToDelete = sessions.value.find(s => s.id === sessionId);
+    if (window.confirm(`Delete session for ${formatDateForDisplay(sToDelete?.session_date)} and all attendance?`)) {
+        try {
+            await apiCall(`/sessions/${sessionId}`, 'DELETE');
+            successNotification.value = { show: true, message: `Session for ${formatDateForDisplay(sToDelete?.session_date)} deleted.`, details: '' };
+            await fetchSessions();
+            if (view.value === 'attendance' && selectedSession.value?.id === sessionId) handleBackToSessions();
+        } catch (err) { /* Handled */ }
+        finally { setTimeout(() => successNotification.value.show = false, 4000); }
+    }
+};
+
+// --- Attendance Actions (remains the same) ---
+const handleViewAttendance = async (session) => {
+    selectedSession.value = session; view.value = 'attendance'; await fetchAttendanceForSession(session.id);
+};
+const handleBackToSessions = async () => {
+  const ok = await confirmIfUnsavedChanges('sessions');
+  if (!ok) return;
+  selectedSession.value = null;
+  currentAttendance.value = [];
+  view.value = 'sessions';
+};
+
+// In App.vue's <script setup>
+const handleSaveAttendance = async (attendanceData) => {
+    if (!selectedSession.value) {
+        // You might want to use your notification system here too
+        error.value = 'Error: No session selected.';
+        return 'Error: No session selected.';
+    }
+
+    const payload = attendanceData.map(att => ({
+        session_id: selectedSession.value.id,
+        participant_id: att.participant_id,
+        attended: att.attended,
+        notes: att.notes
+    }));
+
+    // --- ADD THIS CHECK ---
+    if (payload.length === 0) {
+        console.log("No attendance data to save for this session.");
+        // Optionally notify the user that there were no changes or nothing to save.
+        // For example, using your successNotification or vue-notification:
+        // notify({ type: "info", title: "Attendance", text: "No attendance changes to save." });
+        successNotification.value = { show: true, message: `Attendance confirmed (no changes to save).`, details: '' };
+        if (attendanceRef.value) attendanceRef.value.hasUnsavedChanges = false; // Still mark as "saved"
+        setTimeout(() => successNotification.value.show = false, 4000);
+        return; // Exit without making the API call
+    }
+    // --- END OF ADDED CHECK ---
+
+    saving.value = true; // Moved saving state here
+    error.value = null;  // Clear previous errors
+    let apiError = null;
+    try {
+        await apiCall('/attendance', 'POST', { attendance: payload });
+        successNotification.value = { show: true, message: `Attendance for ${formatDateForDisplay(selectedSession.value.session_date)} saved.`, details: '' };
+        if (attendanceRef.value) attendanceRef.value.hasUnsavedChanges = false;
+    } catch (err) {
+        // error.value is already set by your modified apiCall
+        apiError = error.value || 'Failed to save one or more attendance records.';
+    } finally {
+        saving.value = false; // Moved saving state here
+        // Only set timeout if a notification was actually shown by the try/catch block
+        if (successNotification.value.show || apiError) {
+             setTimeout(() => {
+                successNotification.value.show = false;
+                // If you display apiError in a similar toast, clear it too
+             }, 4000);
+        }
+    }
+    return apiError;
+};
 
 
 // --- Authentication Methods ---
@@ -415,7 +541,7 @@ const handleLogout = async (isAutoLogout = false) => {
                             <ul class="nav nav-pills flex-column mb-auto px-2">
                                 <li class="nav-item">
                                     <a href="#" class="nav-link d-flex align-items-center" :class="{ 'active': view === 'dashboard' }" @click.prevent="handleNavigation('dashboard')">
-                                        <BarChart2 class="me-2 flex-shrink-0" :size="18" /> Dashboard
+                                        <BarChart2 class="me-2 flex-shrink-0" :size="18" /> Tableau de bord
                                     </a>
                                 </li>
                                 <li class="nav-item">
@@ -504,7 +630,7 @@ const handleLogout = async (isAutoLogout = false) => {
                     <ul class="nav nav-pills flex-column sidebar mb-auto">
                         <li class="nav-item">
                             <a href="#" class="nav-link d-flex align-items-center" :class="{ 'active': view === 'dashboard' }" @click.prevent="handleNavigation('dashboard')" data-bs-dismiss="offcanvas">
-                                <BarChart2 class="me-2 flex-shrink-0" :size="20" /> Dashboard
+                                <BarChart2 class="me-2 flex-shrink-0" :size="20" /> Tableau de bord
                             </a>
                         </li>
                         <li class="nav-item">
@@ -531,12 +657,35 @@ const handleLogout = async (isAutoLogout = false) => {
                 </div>
             </div>
 
-            <BaseModal v-model:show="showParticipantModal" :title="editingParticipant ? 'Edit Participant' : 'Add New Participant'" size="modal-lg" @close="editingParticipant = null">
-                 </BaseModal>
+           <BaseModal v-model:show="showParticipantModal" :title="editingParticipant ? 'Edit Participant' : 'Add New Participant'" size="modal-lg" @close="editingParticipant = null">
+                <ParticipantForm ref="participantFormRef" :initialParticipant="editingParticipant" :participants="participants" :saving="saving" @save="handleSaveParticipant" @cancel="showParticipantModal = false"/>
+                <template #footer>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @click="showParticipantModal = false" :disabled="saving">Annuler</button>
+                    <button type="button" class="btn btn-primary btn-sm d-flex align-items-center" @click="participantFormRef?.submit()" :disabled="saving">
+                        <span v-if="saving" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        <Save v-else class="me-2" :size="16" />
+                        {{ saving ? (editingParticipant ? 'Saving...' : 'Adding...') : (editingParticipant ? 'Save Changes' : 'Add Participant') }}
+                    </button>
+                </template>
+            </BaseModal>
             <BaseModal v-model:show="showSessionModal" title="Add New Study Session" @close="showSessionModal = false">
-                </BaseModal>
-            <BaseModal v-model:show="showUnsavedModal" title="Unsaved Changes" size="modal-md">
-                </BaseModal>
+                <SessionForm ref="sessionFormRef" :saving="saving" @save="handleSaveSession" @cancel="showSessionModal = false"/>
+                <template #footer>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @click="showSessionModal = false" :disabled="saving">Annuler</button>
+                    <button type="button" class="btn btn-primary btn-sm d-flex align-items-center" @click="sessionFormRef?.submit()" :disabled="saving">
+                        <span v-if="saving" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        <Save v-else class="me-2" :size="16" />
+                        {{ saving ? 'Adding...' : 'Add Session' }}
+                    </button>
+                </template>
+            </BaseModal>
+            <BaseModal v-model:show="showUnsavedModal" title="Modifications non enregistrées">
+                <p>Vous avez des changements non enregistrés dans la feuille de présence. Voulez-vous les abandonner ?</p>
+                <template #footer>
+                    <button class="btn btn-outline-secondary btn-sm" @click="cancelUnsavedNavigation">Annuler</button>
+                    <button class="btn btn-danger btn-sm" @click="discardUnsavedChanges">Abandonner les changements</button>
+                </template>
+            </BaseModal>
 
             <footer class="app-footer text-center text-muted small py-3 bg-white border-top mt-auto">
                 IMPACT2025 - Mahabo &copy; {{ new Date().getFullYear() }}

@@ -1,166 +1,136 @@
 <script setup>
-import { ref, onMounted, watch, onBeforeUnmount } from 'vue'; // Added onBeforeUnmount
+// --- Start of the SINGLE script setup block ---
+import { ref, onMounted, watch } from 'vue';
 import bootstrap from 'bootstrap/dist/js/bootstrap.bundle.min.js';
-// import { X } from 'lucide-vue-next'; // Not used in template, can be removed if not needed elsewhere
+import { X } from 'lucide-vue-next'; // For the close button icon
 
+// --- Props ---
+// Define what data this component accepts from the parent
 const props = defineProps({
-  show: Boolean,
-  title: String,
-  size: String,
-  hideHeader: Boolean,
-  hideFooter: Boolean,
-  persistentBackdrop: { // New prop to control backdrop behavior
-    type: Boolean,
-    default: false, // Default is to close on backdrop click
-  }
+  show: Boolean,      // Controls visibility from the parent (used with v-model:show)
+  title: String,      // Modal title text
+  size: String,       // Optional size class (e.g., 'modal-lg', 'modal-sm')
+  hideHeader: Boolean, // Option to hide the entire header section
+  hideFooter: Boolean, // Option to hide the entire footer section
 });
 
-const emit = defineEmits(['close', 'update:show']);
+// --- Emits ---
+// Define events this component can send back up to the parent
+const emit = defineEmits([
+    'close',        // Emitted when the modal requests to be closed (e.g., via button)
+    'update:show'   // Used for v-model binding to sync the 'show' prop
+]);
 
+// --- State ---
+// Reactive reference to the modal's root DOM element
 const modalElementRef = ref(null);
+// Reference to store the initialized Bootstrap 5 modal instance
 const modalInstance = ref(null);
 
+// --- Methods ---
+// Function to initialize the Bootstrap modal JS instance
 const initializeModal = () => {
-  if (modalElementRef.value && props.show) { // Only initialize if shown and element exists
-    if (modalInstance.value) { // Dispose existing instance if any
-        modalInstance.value.dispose();
-    }
+  if (modalElementRef.value) {
+    // Create a new Bootstrap modal instance associated with our DOM element
     modalInstance.value = new bootstrap.Modal(modalElementRef.value, {
-      backdrop: props.persistentBackdrop ? 'static' : true, // 'static' prevents closing on click
-      keyboard: !props.persistentBackdrop, // Allow Esc key if not persistent
+      // Options (uncomment to customize):
+      // backdrop: 'static', // Prevent closing on backdrop click
+      // keyboard: false   // Prevent closing with the Escape key
     });
 
-    modalElementRef.value.addEventListener('hidden.bs.modal', handleBootstrapHideEvent);
-    modalInstance.value.show(); // Show it since props.show is true
+    // Listen for Bootstrap's 'hidden.bs.modal' event.
+    // This event fires after the modal has finished hiding.
+    modalElementRef.value.addEventListener('hidden.bs.modal', () => {
+      // When Bootstrap hides the modal, notify the parent component
+      // by emitting 'update:show' with false. This keeps the v-model sync correct.
+      emit('update:show', false);
+      // Also emit the generic 'close' event for other potential listeners
+      emit('close');
+    });
+
+    // Optional: Listen for the 'shown.bs.modal' event if needed
+    // modalElementRef.value.addEventListener('shown.bs.modal', () => {
+    //   console.log('Bootstrap modal instance shown.');
+    // });
   }
 };
 
-const destroyModal = () => {
-    if (modalInstance.value) {
-        // Remove event listener before disposing to prevent errors
-        if (modalElementRef.value) {
-            modalElementRef.value.removeEventListener('hidden.bs.modal', handleBootstrapHideEvent);
-        }
-        modalInstance.value.dispose();
-        modalInstance.value = null;
-    }
-    // Ensure body class is removed if modal is destroyed while shown
-    if (typeof document !== 'undefined' && document.body.classList.contains('modal-open')) {
-        document.body.classList.remove('modal-open');
-    }
-};
-
-const handleBootstrapHideEvent = () => {
-  // This is called by Bootstrap AFTER it has hidden the modal
-  // So, we just sync the parent's state.
-  emit('update:show', false);
-  emit('close');
-};
-
-const handleCloseRequest = () => {
-  // This is called by our UI elements (close button, footer button)
-  // It tells the parent to set `show` to false.
-  // The watcher will then call modalInstance.value.hide().
+// Function to handle clicks on the header's close button (or any explicit close request)
+const handleClose = () => {
+  // Request the parent to hide the modal by emitting 'update:show' with false.
+  // The watcher below will then call modalInstance.value.hide().
   emit('update:show', false);
 };
 
-
-watch(() => props.show, (newValue, oldValue) => {
-  if (newValue) {
-    // If props.show becomes true, and modal element is ready (due to v-if)
-    // We need to ensure the modal is initialized and then shown.
-    // Using nextTick to ensure DOM is updated by v-if before initializing.
-    if (typeof requestAnimationFrame === 'function') { // Prefer requestAnimationFrame for smoother rendering
-        requestAnimationFrame(() => {
-            if (modalElementRef.value) initializeModal();
-        });
-    } else { // Fallback for older environments
-        setTimeout(() => { // Fallback to ensure DOM is ready
-            if (modalElementRef.value) initializeModal();
-        }, 0);
-    }
-  } else {
-    // If props.show becomes false, and modal instance exists
-    if (modalInstance.value) {
-      modalInstance.value.hide();
-    }
-  }
-}, { immediate: false }); // No immediate needed, v-if handles initial state
-
-// Clean up Bootstrap modal instance and body class when component is unmounted
-onBeforeUnmount(() => {
-  destroyModal();
+// --- Lifecycle Hooks ---
+// When the component is mounted to the DOM, initialize the Bootstrap modal JS
+onMounted(() => {
+  initializeModal();
 });
 
-// Handle body class for scrollbar when modal is open/closed by Bootstrap's show/hide
-// This is more robust if Bootstrap's events are used.
+// --- Watchers ---
+// Watch the 'show' prop passed down from the parent component.
 watch(() => props.show, (newValue) => {
-    if (typeof document !== 'undefined') {
-        if (newValue) {
-            // Bootstrap's JS usually handles adding 'modal-open' when its .show() is called.
-            // However, if we are managing display with v-if, we might need to manage it.
-            // For this version, we let Bootstrap's .show() method handle it.
-        } else {
-            // If the modal is hidden via v-if, ensure the class is removed.
-            // Bootstrap's 'hidden.bs.modal' event should also trigger this.
-            if (document.body.classList.contains('modal-open') && !document.querySelector('.modal.show')) {
-                 document.body.classList.remove('modal-open');
-            }
-        }
+  // If the modal instance exists (i.e., component is mounted)
+  if (modalInstance.value) {
+    // If the parent wants to show the modal (props.show becomes true)
+    if (newValue) {
+      modalInstance.value.show(); // Call Bootstrap's show method
+    } else {
+      // If the parent wants to hide the modal (props.show becomes false)
+      modalInstance.value.hide(); // Call Bootstrap's hide method
     }
+  }
 });
-
+// --- End of the SINGLE script setup block ---
 </script>
 
 <template>
-  <template v-if="props.show">
-    <div
-      class="modal fade" ref="modalElementRef"
-      tabindex="-1"
-      :aria-labelledby="title ? 'modalTitle-' + title.replace(/\s+/g, '') : null"
-      aria-hidden="true"
-      ><div class="modal-dialog modal-dialog-centered" :class="size">
-        <div class="modal-content">
-          <div v-if="!hideHeader" class="modal-header">
-            <h5
-              v-if="title"
-              class="modal-title"
-              :id="title ? 'modalTitle-' + title.replace(/\s+/g, '') : null"
-            >
-              {{ title }}
-            </h5>
-            <button
-              type="button"
-              class="btn-close"
-              @click="handleCloseRequest"
-              aria-label="Close"
-            ></button>
-          </div>
+  <div
+    class="modal fade"
+    ref="modalElementRef"
+    tabindex="-1"
+    :aria-labelledby="title ? 'modalTitle-' + title.replace(/\s+/g, '') : null"
+    aria-hidden="true"
+    data-bs-backdrop="static" data-bs-keyboard="false" >
+    <div class="modal-dialog modal-dialog-centered" :class="size">
+      <div class="modal-content">
+        <div v-if="!hideHeader" class="modal-header">
+          <h5
+            v-if="title"
+            class="modal-title"
+            :id="title ? 'modalTitle-' + title.replace(/\s+/g, '') : null"
+          >
+            {{ title }}
+          </h5>
+          <button
+            type="button"
+            class="btn-close"
+            @click="handleClose"
+            aria-label="Close"
+          ></button>
+        </div>
 
-          <div class="modal-body">
-            <slot></slot> </div>
+        <div class="modal-body">
+          <slot></slot>
+        </div>
 
-          <div v-if="!hideFooter && $slots.footer" class="modal-footer">
-            <slot name="footer"></slot> </div>
-          <div v-else-if="!hideFooter && !$slots.footer" class="modal-footer">
-            <button type="button" class="btn btn-secondary btn-sm" @click="handleCloseRequest">
+        <div v-if="!hideFooter" class="modal-footer">
+           <slot name="footer">
+            <button type="button" class="btn btn-secondary btn-sm" @click="handleClose">
                 Close
-            </button>
-          </div>
+             </button>
+          </slot>
         </div>
       </div>
     </div>
-    </template>
+  </div>
 </template>
 
 <style scoped>
 /* Add any component-specific styles here if needed */
 .modal-header, .modal-footer {
    /* Example: Add a slightly lighter background */
-   /* background-color: rgba(0, 0, 0, 0.03); */ /* Keep Bootstrap defaults or customize as needed */
-}
-/* Ensure modal is displayed correctly when .show is added by Bootstrap JS */
-.modal.fade.show {
-    display: block;
+   background-color: rgba(0, 0, 0, 0.03);
 }
 </style>

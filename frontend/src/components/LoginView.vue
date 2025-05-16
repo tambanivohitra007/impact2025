@@ -97,17 +97,17 @@ const requestRegistrationView = () => {
           />
         </div>
 
-        <div class="d-grid gap-2 mb-3">
-          <button
-            type="submit"
-            class="btn btn-primary btn-md d-flex align-items-center justify-content-center"
-            :disabled="props.loading"
-          >
-            <span v-if="props.loading" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-            <LogIn v-else :size="20" class="me-2" />
-            {{ props.loading ? 'Logging in...' : 'Login' }}
-          </button>
-        </div>
+        <div class="d-grid mb-3">
+            <button
+              type="submit"
+              class="btn btn-primary-gradient btn-lg d-flex align-items-center justify-content-center rounded-pill"
+              :disabled="props.loading"
+            >
+              <span v-if="props.loading" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+              <LogIn v-else :size="20" class="me-2" />
+              {{ props.loading ? 'Connexion...' : 'Se Connecter' }}
+            </button>
+          </div>
       </form>
 
       <div class="text-center">
@@ -128,19 +128,74 @@ const requestRegistrationView = () => {
 </template>
 
 <style scoped>
-/* Scoped styles can be kept minimal if Bootstrap is handling most of it */
-.card {
-  border: none; /* Remove default card border if using shadow for elevation */
+/* Ensure the overall container takes full viewport height if this is the root view for login */
+.container-fluid.vh-100 {
+  min-height: 100vh;
 }
+
+.form-control-lg {
+  padding: 0.75rem 1rem; /* Slightly larger padding for a modern feel */
+  font-size: 1rem;
+}
+
+.btn-md {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
 .btn-link {
   text-decoration: none;
-  font-weight: 500;
+  font-weight: 500; /* Make link slightly bolder */
 }
 .btn-link:hover {
   text-decoration: underline;
 }
-/* Ensure icons are vertically aligned with button text */
+
 .btn .lucide {
-  vertical-align: middle;
+  vertical-align: middle; /* Better icon alignment */
+  margin-top: -2px; /* Fine-tune icon position */
+}
+
+.alert .lucide {
+    vertical-align: middle;
+    margin-top: -1px;
+}
+
+/* Optional: Add subtle transitions */
+.form-control, .btn {
+  transition: all 0.2s ease-in-out;
+}
+
+.form-control:focus {
+  border-color: var(--bs-primary);
+  box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25);
+}
+
+/* Specific styles for the branding column if needed */
+.branding-column {
+  /* Background is set inline for dynamic var usage, but can be moved here if static */
+  background-size: cover;
+  background-position: center;
+}
+
+/* Custom gradient button */
+.btn-primary-gradient {
+  background-image: linear-gradient(to right, var(--bs-primary) 0%, var(--bs-primary-dark, #0a58ca) 50%, var(--bs-primary) 100%);
+  background-size: 200% auto; /* For hover effect */
+  color: white;
+  border: none; /* Remove border if using gradient background */
+  transition: background-position 0.4s ease-in-out; /* Smooth transition for hover */
+}
+
+.btn-primary-gradient:hover {
+  background-position: right center; /* Change gradient direction on hover */
+  color: white;
+  box-shadow: 0 4px 15px 0 rgba(var(--bs-primary-rgb), 0.35);
+}
+
+/* Ensure rounded-pill is effective */
+.rounded-pill {
+  border-radius: 50rem !important; /* Bootstrap's default for rounded-pill */
 }
 </style>

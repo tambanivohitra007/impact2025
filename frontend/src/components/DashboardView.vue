@@ -293,10 +293,10 @@ const formatDateForDisplay = (dateString) => {
         <div class="card-header bg-light p-3 flex-shrink-0">
             <div class="d-flex flex-wrap justify-content-between align-items-center">
                 <h4 class="mb-0 d-flex align-items-center">
-                    <BarChart2 :size="28" class="me-2 text-primary" />Dashboard
+                    <BarChart2 :size="28" class="me-2 text-primary" />Tableau de Bord
                 </h4>
                 <div class="ms-auto mt-2 mt-md-0">
-                    <label for="statsDate" class="form-label form-label-sm visually-hidden">Date for Locality Stats</label>
+                    <label for="statsDate" class="form-label form-label-sm visually-hidden">Date des statistiques par localité</label>
                     <input type="date" class="form-control form-control-sm" id="statsDate" v-model="selectedDate" style="max-width: 180px;">
                 </div>
             </div>
@@ -307,11 +307,11 @@ const formatDateForDisplay = (dateString) => {
                 <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
                     <span class="visually-hidden">Loading...</span>
                 </div>
-                <p class="mt-2 text-muted">Loading dashboard data...</p>
+                <p class="mt-2 text-muted">Chargement de données...</p>
             </div>
             <div v-else-if="error" class="alert alert-danger mx-3" role="alert">
                 <AlertCircle :size="20" class="me-2" />
-                Error loading dashboard data: {{ error }}
+                Erreur de chargement: {{ error }}
             </div>
             
             <div v-else class="row g-3 g-lg-4">
@@ -328,7 +328,7 @@ const formatDateForDisplay = (dateString) => {
                     <div class="card shadow-sm h-100 border-start border-success border-4" style="cursor: pointer;" @click="showBaptismListModal = true">
                         <div class="card-body text-center d-flex flex-column justify-content-center">
                             <CalendarCheck class="text-success mb-2 mx-auto" :size="32" />
-                            <h6 class="card-subtitle mb-1 text-muted small text-uppercase">Future Baptisms</h6>
+                            <h6 class="card-subtitle mb-1 text-muted small text-uppercase">Baptême à Venir</h6>
                             <p class="display-6 fw-bold mb-0">{{ stats.futureBaptisms?.length || 0 }}</p>
                         </div>
                     </div>
@@ -337,7 +337,7 @@ const formatDateForDisplay = (dateString) => {
                     <div class="card shadow-sm h-100 border-start border-info border-4">
                         <div class="card-body text-center d-flex flex-column justify-content-center">
                             <TrendingUp class="text-info mb-2 mx-auto" :size="32" />
-                            <h6 class="card-subtitle mb-1 text-muted small text-uppercase">Present Today ({{ formatDateForDisplay(selectedDate) }})</h6>
+                            <h6 class="card-subtitle mb-1 text-muted small text-uppercase">Present ({{ formatDateForDisplay(selectedDate) }})</h6>
                             <p class="display-6 fw-bold mb-0">{{ totalPresentToday }}</p>
                         </div>
                     </div>
@@ -346,7 +346,7 @@ const formatDateForDisplay = (dateString) => {
                     <div class="card shadow-sm h-100 border-start border-warning border-4">
                         <div class="card-body text-center d-flex flex-column justify-content-center">
                             <Award class="text-warning mb-2 mx-auto" :size="32" />
-                            <h6 class="card-subtitle mb-1 text-muted small text-uppercase">Perfect Attendance</h6>
+                            <h6 class="card-subtitle mb-1 text-muted small text-uppercase">Assiduité</h6>
                             <p class="display-6 fw-bold mb-0">{{ stats.perfectAttendance?.length || 0 }}</p>
                         </div>
                     </div>
@@ -356,7 +356,7 @@ const formatDateForDisplay = (dateString) => {
                     <div class="card shadow-sm h-100">
                         <div class="card-header bg-light py-2">
                             <h6 class="card-title d-flex align-items-center mb-0 small text-uppercase">
-                                <BarChart2 class="me-2 text-primary" :size="18" /> Attendance per Session
+                                <BarChart2 class="me-2 text-primary" :size="18" /> Présence par session
                             </h6>
                         </div>
                         <div class="card-body">
@@ -370,7 +370,7 @@ const formatDateForDisplay = (dateString) => {
                     <div class="card shadow-sm h-100">
                         <div class="card-header bg-light py-2">
                             <h6 class="card-title d-flex align-items-center mb-0 small text-uppercase">
-                                <TrendingUp class="me-2 text-info" :size="18" /> Top Referrers
+                                <TrendingUp class="me-2 text-info" :size="18" /> Meilleurs référents
                             </h6>
                         </div>
                         <div class="card-body p-0" style="max-height: 280px; overflow-y: auto;">
@@ -380,7 +380,7 @@ const formatDateForDisplay = (dateString) => {
                                     <span class="badge bg-info rounded-pill ms-2">{{ ref.referral_count }}</span>
                                 </li>
                             </ul>
-                            <p v-else class="text-muted text-center small p-3 mb-0">No referrer data available.</p>
+                            <p v-else class="text-muted text-center small p-3 mb-0">Aucune donnée de référent disponible.</p>
                         </div>
                     </div>
                 </div>
@@ -389,7 +389,7 @@ const formatDateForDisplay = (dateString) => {
                     <div class="card shadow-sm h-100">
                         <div class="card-header bg-light py-2">
                             <h6 class="card-title d-flex align-items-center mb-0 small text-uppercase">
-                                <UserPlus class="me-2 text-success" :size="18" /> New Participants by Day
+                                <UserPlus class="me-2 text-success" :size="18" /> Nouveaux participants par jour
                             </h6>
                         </div>
                         <div class="card-body">
@@ -403,7 +403,7 @@ const formatDateForDisplay = (dateString) => {
                     <div class="card shadow-sm h-100">
                         <div class="card-header bg-light py-2">
                             <h6 class="card-title d-flex align-items-center mb-0 small text-uppercase">
-                                <Award class="me-2 text-warning" :size="18" /> Perfect Attendance List
+                                <Award class="me-2 text-warning" :size="18" /> Liste des présences parfaites
                             </h6>
                         </div>
                         <div class="card-body p-0" style="max-height: 280px; overflow-y: auto;">
@@ -412,7 +412,7 @@ const formatDateForDisplay = (dateString) => {
                                     {{ p.name }}
                                 </li>
                             </ul>
-                            <p v-else class="text-muted text-center small p-3 mb-0">No one has attended all sessions yet.</p>
+                            <p v-else class="text-muted text-center small p-3 mb-0">Aucun participant.</p>
                         </div>
                     </div>
                 </div>
@@ -422,7 +422,7 @@ const formatDateForDisplay = (dateString) => {
                         <div class="card-header bg-light py-2">
                             <h6 class="card-title d-flex align-items-center mb-0 small text-uppercase">
                                 <MapPin class="me-2 text-danger" :size="18" />
-                                Attendance by Locality ({{ formatDateForDisplay(selectedDate) }})
+                                Taux de présence par localité ({{ formatDateForDisplay(selectedDate) }})
                             </h6>
                         </div>
                         <div class="card-body p-0">
@@ -430,8 +430,8 @@ const formatDateForDisplay = (dateString) => {
                                 <table class="table table-sm table-hover table-striped mb-0">
                                     <thead class="table-light">
                                         <tr>
-                                            <th>Locality</th>
-                                            <th class="text-end">Present Count</th>
+                                            <th>Localités</th>
+                                            <th class="text-end">Nombre de présents</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -442,7 +442,7 @@ const formatDateForDisplay = (dateString) => {
                                     </tbody>
                                 </table>
                             </div>
-                            <p v-else class="text-muted text-center small p-3 mb-0">No attendance data for localities on {{ formatDateForDisplay(selectedDate) }}.</p>
+                            <p v-else class="text-muted text-center small p-3 mb-0">Aucune donnée de présence pour les localités le {{ formatDateForDisplay(selectedDate) }}.</p>
                         </div>
                     </div>
                 </div>
@@ -454,18 +454,18 @@ const formatDateForDisplay = (dateString) => {
             <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title" id="baptismModalLabel">Participants Interested in Baptism</h5>
+                        <h5 class="modal-title" id="baptismModalLabel">Participants intéressés par le baptême</h5>
                         <button type="button" class="btn-close" @click="showBaptismListModal = false" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
                         <div v-if="!stats.futureBaptisms || stats.futureBaptisms.length === 0" class="text-center text-muted p-3">
-                            No participants currently listed as interested in baptism.
+                           Aucun participant n’est actuellement inscrit comme intéressé par le baptême.
                         </div>
                         <table v-else class="table table-striped table-hover table-sm">
                             <thead>
                                 <tr>
                                     <th>ID</th>
-                                    <th>Name</th>
+                                    <th>Nom</th>
                                     </tr>
                             </thead>
                             <tbody>
@@ -477,7 +477,7 @@ const formatDateForDisplay = (dateString) => {
                         </table>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary btn-sm" @click="showBaptismListModal = false">Close</button>
+                        <button type="button" class="btn btn-secondary btn-sm" @click="showBaptismListModal = false">Fermer</button>
                     </div>
                 </div>
             </div>

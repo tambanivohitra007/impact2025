@@ -122,7 +122,6 @@ const submit = async () => {
       return;
   }
 
-
   const dataToSave = {
     name: formData.name.trim(),
     contact_info: formData.contact_info?.trim() || null,
@@ -141,6 +140,10 @@ const submit = async () => {
   if (apiError) {
     formError.value = apiError;
   } else {
+    // Show popup with new participant ID if available
+    if (dataToSave.id) {
+      alert('Nouveau participant ajouté avec l\'ID : ' + dataToSave.id);
+    }
     // Reset form after successful save
     resetForm(null);
   }

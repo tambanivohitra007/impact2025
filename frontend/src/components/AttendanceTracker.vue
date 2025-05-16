@@ -95,10 +95,40 @@ const filteredAttendance = computed(() => {
   );
 });
 
+// Likely in your AttendanceTracker.vue or a similar component/utility file
+
+// Make sure API_BASE_URL is defined or imported in this scope
+// const API_BASE_URL = import.meta.env.VITE_API_BASE_URL; // Or passed as prop, etc.
+
 const fetchAttendanceSummary = async () => {
   try {
-    const response = await fetch(`${API_BASE_URL}/participants/attendance-summary`);
-    if (!response.ok) throw new Error('Erreur de chargement du résumé de présence');
+    const headers = {
+      'Content-Type': 'application/json',
+    };
+    const token = localStorage.getItem('authToken'); // Retrieve the token
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    } else {
+      // Handle cases where the token might be missing for a protected route
+      console.warn("fetchAttendanceSummary: No auth token found. The request might be denied by the server.");
+      // You might want to throw an error here or prevent the call if a token is absolutely required
+      // throw new Error("Authentication token not found. Please log in.");
+    }
+
+    const response = await fetch(`${API_BASE_URL}/participants/attendance-summary`, { headers }); // Add headers to the fetch request
+
+    if (!response.ok) {
+      // Try to get more specific error from server response if possible
+      let errorMsg = 'Erreur de chargement du résumé de présence';
+      try {
+        const errorData = await response.json();
+        errorMsg = errorData.error || errorData.message || errorMsg;
+      } catch (e) {
+        // Could not parse JSON, use the original error
+      }
+      throw new Error(errorMsg);
+    }
 
     const data = await response.json();
 
@@ -107,12 +137,15 @@ const fetchAttendanceSummary = async () => {
       map[entry.id] = entry.attended_sessions;
     });
 
+    // Assuming attendanceSummaryMap and totalSessions are reactive refs
     attendanceSummaryMap.value = map;
     totalSessions.value = data.length > 0 ? data[0].total : 0;
-    console.log(data);
+    console.log("Attendance Summary Data:", data);
 
   } catch (err) {
     console.error("Erreur fetchAttendanceSummary:", err);
+    // You might want to set an error ref here to display to the user
+    // errorStateForAttendanceSummary.value = err.message;
   }
 };
 

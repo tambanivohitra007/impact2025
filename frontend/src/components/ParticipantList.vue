@@ -16,6 +16,10 @@ const props = defineProps({
   itemsPerPage: { // Added prop for items per page
     type: Number,
     default: 10 // Default items per page
+  },
+  newlyCreatedId: {
+    type: [Number, String],
+    default: null
   }
 });
 
@@ -179,7 +183,8 @@ const handleBaptismToggle = async (participant) => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="p in paginatedParticipants" :key="p.id">
+              <tr v-for="p in paginatedParticipants" :key="p.id"
+                  :class="{'highlight-new': p.id === Number(props.newlyCreatedId)}">
                 <td class="align-middle px-3">
                   <div class="fw-medium">{{ p.name }}</div>
                   <div class="small text-muted">
@@ -209,10 +214,15 @@ const handleBaptismToggle = async (participant) => {
         </div>
 
         <div class="list-group list-group-flush d-md-none">
-          <div v-for="p in paginatedParticipants" :key="p.id" class="list-group-item px-3 py-2">
+          <div v-for="p in paginatedParticipants" :key="p.id"
+               class="list-group-item px-3 py-2"
+               :class="{'highlight-new': p.id === Number(props.newlyCreatedId)}">
             <div class="d-flex w-100 justify-content-between align-items-start">
               <div>
                 <h6 class="mb-1 fw-bold">{{ p.name }}</h6>
+                <div v-if="p.id" class="participant-id-mobile mb-1">
+                  <span>ID: </span><span class="display-6 fw-bold text-primary">{{ p.id }}</span>
+                </div>
                 <small class="text-muted d-block">
                   <UserCircle :size="14" class="me-1 align-text-bottom" />
                   {{ p.age ? `${p.age} yrs` : 'Age N/A' }}, {{ p.gender ? formatGender(p.gender) : 'Gender N/A' }}
@@ -359,6 +369,23 @@ const handleBaptismToggle = async (participant) => {
 .form-check-input {
   cursor: pointer;
   transform: scale(1.1);
+}
+
+.participant-id-mobile {
+  font-size: 2rem;
+  font-weight: bold;
+  color: var(--bs-primary, #0d6efd);
+  line-height: 1.1;
+}
+
+.highlight-new {
+  animation: highlight-fade 2.5s ease-out;
+  background-color: #fff3cd !important; /* Bootstrap warning bg */
+}
+@keyframes highlight-fade {
+  0% { background-color: #ffe066; }
+  60% { background-color: #fff3cd; }
+  100% { background-color: inherit; }
 }
 
 </style>
