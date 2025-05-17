@@ -38,7 +38,7 @@
                 <th scope="col">ID</th>
                 <th scope="col">Nom</th>
                 <th scope="col">Rôle</th>
-                <!-- <th scope="col">Créé le</th> -->
+                <th scope="col">Approbation</th>
                 <th scope="col" class="text-end">Actions</th>
               </tr>
             </thead>
@@ -51,9 +51,21 @@
                     {{ user.role }}
                   </span>
                 </td>
-                <!-- <td>{{ formatDateForDisplay(user.created_at) }}</td> -->
+                <td>
+                  <span v-if="user.approved" class="badge bg-success">Approuvé</span>
+                  <span v-else class="badge bg-warning text-dark">En attente                    
+                  </span>
+                </td>
                 <td class="text-end">
+                  
                   <div class="btn-group btn-group-sm" role="group">
+                    <button 
+                      v-if="!user.approved" 
+                      class="btn btn-sm btn-warning ms-2" 
+                      @click="approveUser(user)" 
+                      :disabled="saving.editUser">
+                    <Check class="me-1" :size="14" />
+                    </button>
                     <button
                       class="btn btn-outline-primary d-flex align-items-center"
                       @click="showEditUserForm(user)"
@@ -170,7 +182,6 @@
 
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue';
-import { useNotification } from "@kyvg/vue3-notification"; // Import vue-notification
 import {
     Settings as SettingsIcon,
     Users as UsersIcon,
@@ -179,7 +190,8 @@ import {
     AlertCircle as AlertCircleIcon,
     Save as SaveIcon,
     Edit3 as Edit3Icon,
-    ArrowLeft as ArrowLeftIcon
+    ArrowLeft as ArrowLeftIcon,
+    Check
 } from 'lucide-vue-next';
 
 const { notify } = useNotification(); // Destructure notify function
@@ -386,6 +398,22 @@ const confirmDeleteUser = async (user) => {
   }
 };
 
+const approveUser = async (user) => {
+  if (user.approved) return;
+  saving.editUser = true;
+  try {
+    await props.apiCall(`/admin/users/${user.id}/approve`, 'PUT');
+    notify({ type: "success", title: "User Approved", text: `User "${user.username}" has been approved.` });
+    await fetchUsers();
+  } catch (err) {
+    console.error("Failed to approve user:", err);
+    const errorMessage = err.response?.data?.error || err.message || 'Failed to approve user.';
+    notify({ type: "error", title: "Approve User Failed", text: errorMessage });
+  } finally {
+    saving.editUser = false;
+  }
+};
+
 const formatDateForDisplay = (dateString) => {
   if (!dateString) return 'N/A';
   try {
@@ -406,10 +434,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.card.h-100 {
-}
-.card-body {
-}
 .card-header h2.h5 {
     margin-bottom: 0 !important;
 }

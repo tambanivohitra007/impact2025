@@ -140,7 +140,7 @@ const submit = async () => {
   if (apiError) {
     formError.value = apiError;
   } else {
-    // Show popup with new participant ID if available
+ 
     if (dataToSave.id) {
       alert('Nouveau participant ajouté avec l\'ID : ' + dataToSave.id);
     }

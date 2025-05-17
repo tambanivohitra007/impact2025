@@ -14,7 +14,7 @@ import logo from './assets/mahabo.png';
 import Admin from './components/Admin.vue';
 import LoginView from './components/LoginView.vue';
 import RegistrationView from './components/RegistrationView.vue';
-
+import { useToast } from 'vue-toastification';
 // Import Icons
 import { BookOpen, Users, Calendar, AlertCircle, Save, PlusCircle, UserCheck, BarChart2, Settings, LogOut, ChevronDown, Menu, List, ChurchIcon, ListCheck } from 'lucide-vue-next';
 
@@ -27,6 +27,7 @@ const participants = ref([]);
 const sessions = ref([]);
 const selectedSession = ref(null);
 const currentAttendance = ref([]);
+const toast = useToast();
 // const installPromptEvent = ref(null); // Not used in provided code, can be removed if not needed
 
 const loading = reactive({
@@ -54,6 +55,8 @@ const showSessionModal = ref(false);
 const sessionFormRef = ref(null);
 
 const attendanceRef = ref(null);
+
+const newlyCreatedId = ref(null);
 
 // --- Computed Properties ---
 const isAdmin = computed(() => {
@@ -113,13 +116,18 @@ async function apiCall(url, method = 'GET', body = null) {
         const response = await fetch(`${API_BASE_URL}${url}`, options);
 
         if (response.status === 401) {
-            // Token expired or invalid
+            // Token expired or invalid: clear all sensitive state and redirect to login
             localStorage.removeItem('authToken');
             loggedIn.value = false;
             currentUserRole.value = null;
+            participants.value = [];
+            sessions.value = [];
+            selectedSession.value = null;
+            currentAttendance.value = [];
             view.value = 'login';
             showRegistration.value = false;
             error.value = 'Session expired. Please log in again.';
+            window.location.reload(); // Force reroute to login immediately
             return;
         }
         
@@ -283,6 +291,7 @@ const handleAddParticipantRequest = () => {
 const handleEditParticipantRequest = (participant) => {
     editingParticipant.value = participant;
     showParticipantModal.value = true;
+    newlyCreatedId.value = null; // Only highlight on create
 };
 
 const handleSaveParticipant = async (participantData) => {
@@ -291,16 +300,33 @@ const handleSaveParticipant = async (participantData) => {
         let savedParticipant;
         if (editingParticipant.value?.id) {
             savedParticipant = await apiCall(`/participants/${editingParticipant.value.id}`, 'PUT', participantData);
-             successNotification.value = { show: true, message: `Participant "${participantData.name}" updated.`, details: '' };
+            successNotification.value = {
+                show: true,
+                message: `Participant "${participantData.name}" updated.`,
+                details: ''
+            };
+            newlyCreatedId.value = null; // Only highlight on create
         } else {
             savedParticipant = await apiCall('/participants', 'POST', participantData);
-            successNotification.value = { show: true, message: `Participant "${savedParticipant.name}" created.`, details: `ID: ${savedParticipant.id}` };
+            successNotification.value = {
+                show: true,
+                message: `Participant "${savedParticipant.name}" created.`,
+                details: `ID: ${savedParticipant.id}`
+            };
+            newlyCreatedId.value = savedParticipant.id; // Highlight new participant
+
+            toast.success(`🎉 Participant "${savedParticipant.name}" added.\nID: ${savedParticipant.id}`);            
         }
-        showParticipantModal.value = false; await fetchParticipants();
-    } catch (err) { apiError = error.value; }
-    finally { setTimeout(() => successNotification.value.show = false, 4000); }
+        showParticipantModal.value = false;
+        await fetchParticipants();
+    } catch (err) {
+        apiError = error.value;
+    } finally {
+        setTimeout(() => successNotification.value.show = false, 4000);
+    }
     return apiError;
 };
+
 const handleDeleteParticipant = async (participantId) => {
     const pToDelete = participants.value.find(p => p.id === participantId);
     if (window.confirm(`Delete "${pToDelete?.name || 'this participant'}"?`)) {
@@ -438,19 +464,17 @@ const processRegistration = async (userData) => {
     error.value = null;
     try {
         const responseData = await apiCall('/auth/register', 'POST', userData);
-        if (responseData && responseData.token && responseData.user) {
-            localStorage.setItem('authToken', responseData.token);
-            currentUserRole.value = responseData.user.role; // Store role
-            loggedIn.value = true;
+        if (responseData && responseData.user) {
+            // Registration successful, but require admin approval
             showRegistration.value = false;
-            await fetchInitialData();
+            error.value = null;
+            successNotification.value = { show: true, message: 'Inscription réussie. Un administrateur doit approuver votre compte avant de pouvoir vous connecter.', details: '' };
+            // Optionally, clear registration form or redirect to login
         } else {
             throw new Error(responseData.error || "Registration failed: Invalid response from server.");
         }
     } catch (err) {
         // error.value is set by apiCall
-        // loggedIn.value = false; // Don't set loggedIn to false here, let fetchInitialData handle it if token is bad
-        // currentUserRole.value = null;
     } finally {
         saving.value = false;
     }
@@ -472,7 +496,7 @@ const handleLogout = async (isAutoLogout = false) => {
     currentAttendance.value = [];
     view.value = 'login';
     showRegistration.value = false;
-    error.value = null;
+    error = null;
 };
 
 </script>
@@ -578,6 +602,7 @@ const handleLogout = async (isAutoLogout = false) => {
                             <ParticipantList v-else-if="view === 'participants'" class="flex-grow-1"
                                 :participants="participants"
                                 :loading="loading.participants"
+                                :newly-created-id="newlyCreatedId"
                                 @add-new-participant="handleAddParticipantRequest"
                                 @edit-participant="handleEditParticipantRequest"
                                 @delete-participant="handleDeleteParticipant"

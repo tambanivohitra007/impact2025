@@ -33,6 +33,7 @@ const db = new sqlite3.Database(DB_PATH, (err) => {
                     username TEXT NOT NULL UNIQUE,
                     password_hash TEXT NOT NULL,
                     role TEXT DEFAULT 'user' CHECK(role IN ('user', 'admin')),
+                    approved INTEGER DEFAULT 0, -- 0 = not approved, 1 = approved
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
@@ -41,13 +42,19 @@ const db = new sqlite3.Database(DB_PATH, (err) => {
                     console.error("Error creating users table:", err.message);
                 } else {
                     console.log("Users table checked/created.");
-                    // Add role column if it doesn't exist (for existing databases)
+                    // Add columns if they don't exist
                     db.run(`ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user' CHECK(role IN ('user', 'admin'))`, (alterErr) => {
                         if (alterErr && !alterErr.message.includes('duplicate column name')) {
                             console.error("Error adding role column to users table:", alterErr.message);
                         } else {
-                             // After users table is confirmed, check/create default admin
-                            checkAndCreateDefaultAdmin();
+                            db.run(`ALTER TABLE users ADD COLUMN approved INTEGER DEFAULT 0`, (apprErr) => {
+                                if (apprErr && !apprErr.message.includes('duplicate column name')) {
+                                    console.error("Error adding approved column to users table:", apprErr.message);
+                                } else {
+                                    // After users table is confirmed, check/create default admin
+                                    checkAndCreateDefaultAdmin();
+                                }
+                            });
                         }
                     });
                 }
@@ -64,8 +71,8 @@ const db = new sqlite3.Database(DB_PATH, (err) => {
                         try {
                             const salt = await bcrypt.genSalt(10);
                             const passwordHash = await bcrypt.hash(DEFAULT_ADMIN_PASSWORD, salt);
-                            db.run(`INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)`,
-                                [DEFAULT_ADMIN_USERNAME, passwordHash, 'admin'],
+                            db.run(`INSERT INTO users (username, password_hash, role, approved) VALUES (?, ?, ?, ?)`,
+                                [DEFAULT_ADMIN_USERNAME, passwordHash, 'admin', 1],
                                 function (insertErr) {
                                     if (insertErr) {
                                         console.error("Error creating default admin user:", insertErr.message);
@@ -220,24 +227,21 @@ app.post('/api/auth/register', async (req, res) => {
 
             const salt = await bcrypt.genSalt(10);
             const passwordHash = await bcrypt.hash(password, salt);
-            const defaultRole = (username === DEFAULT_ADMIN_USERNAME) ? 'admin' : 'user'; // Assign admin role if it's the default admin username during initial setup
-            
-            // Check if it's the default admin trying to register after initial setup
-            if (username === DEFAULT_ADMIN_USERNAME && defaultRole === 'user') {
-                 // This case should ideally not happen if admin is created on startup.
-                 // If it does, it means admin was deleted and is re-registering.
-                 // We might want to prevent this or handle it specifically.
-                 // For now, let them register as a user if the admin account was deleted.
-                 console.warn(`Default admin username "${username}" is re-registering as a user. This might be unintended if an admin account was expected.`);
-            }
+            const defaultRole = (username === DEFAULT_ADMIN_USERNAME) ? 'admin' : 'user';
+            // All new users except default admin must be approved by admin
+            const approved = (defaultRole === 'admin') ? 1 : 0;
 
-
-            const insertSql = `INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)`;
-            db.run(insertSql, [username, passwordHash, defaultRole], function (err) {
+            const insertSql = `INSERT INTO users (username, password_hash, role, approved) VALUES (?, ?, ?, ?)`;
+            db.run(insertSql, [username, passwordHash, defaultRole, approved], function (err) {
                 if (handleDatabaseError(err, res, "Error registering user")) return;
                 const userId = this.lastID;
-                const token = jwt.sign({ id: userId, username: username, role: defaultRole }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
-                res.status(201).json({ message: "User registered successfully.", token, user: { id: userId, username: username, role: defaultRole } });
+                if (approved === 1) {
+                    // Only auto-login if admin
+                    const token = jwt.sign({ id: userId, username: username, role: defaultRole }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+                    res.status(201).json({ message: "Admin user registered and approved.", token, user: { id: userId, username: username, role: defaultRole } });
+                } else {
+                    res.status(201).json({ message: "User registered successfully. Awaiting admin approval.", user: { id: userId, username: username, role: defaultRole, approved: 0 } });
+                }
             });
         });
     } catch (error) {
@@ -250,10 +254,11 @@ app.post('/api/auth/login', (req, res) => {
     const { username, password } = req.body;
     if (!username || !password) return res.status(400).json({ error: "Username and password are required." });
 
-    const sql = `SELECT id, username, password_hash, role FROM users WHERE username = ?`;
+    const sql = `SELECT id, username, password_hash, role, approved FROM users WHERE username = ?`;
     db.get(sql, [username], async (err, user) => {
         if (handleDatabaseError(err, res, "Error during login")) return;
         if (!user) return res.status(401).json({ error: "Invalid username or password." });
+        if (!user.approved) return res.status(403).json({ error: "Votre compte n'a pas encore été approuvé par un administrateur." });
 
         const isMatch = await bcrypt.compare(password, user.password_hash);
         if (!isMatch) return res.status(401).json({ error: "Invalid username or password." });
@@ -269,10 +274,20 @@ app.post('/api/auth/logout', (req, res) => {
 
 // --- Admin User Management API Routes ---
 app.get('/api/admin/users', verifyToken, verifyAdminRole, (req, res) => {
-    const sql = `SELECT id, username, role, created_at, updated_at FROM users ORDER BY username ASC`;
+    const sql = `SELECT id, username, role, approved, created_at, updated_at FROM users ORDER BY username ASC`;
     db.all(sql, [], (err, rows) => {
         if (handleDatabaseError(err, res, "Error fetching users")) return;
         res.json(rows);
+    });
+});
+
+app.put('/api/admin/users/:userId/approve', verifyToken, verifyAdminRole, (req, res) => {
+    const { userId } = req.params;
+    const sql = `UPDATE users SET approved = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+    db.run(sql, [userId], function(err) {
+        if (handleDatabaseError(err, res, `Error approving user ${userId}`)) return;
+        if (this.changes === 0) return res.status(404).json({ error: "User not found or already approved." });
+        res.json({ message: "User approved successfully.", userId: parseInt(userId) });
     });
 });
 

@@ -1,7 +1,21 @@
-import { createApp } from 'vue'
-import './style.css'
-import App from './App.vue'
+import { createApp } from 'vue';
+import './style.css';
+import App from './App.vue';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import Notifications from '@kyvg/vue3-notification';
 
-createApp(App).mount('#app')
+// 👉 Toastification import
+import Toast, { POSITION } from 'vue-toastification';
+import 'vue-toastification/dist/index.css';
+
+const app = createApp(App);
+
+// 👉 Use toast plugin
+app.use(Toast, {
+  position: POSITION.TOP_RIGHT,
+  timeout: 5000,
+  closeOnClick: true,
+  pauseOnHover: true,
+  draggable: true,
+});
+
+app.mount('#app');

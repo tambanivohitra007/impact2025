@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch, nextTick } from 'vue';
 import { Users, Edit, Trash2, Search, MapPin, Phone, UserCircle, CalendarDays, UsersRound, PlusCircle } from 'lucide-vue-next';
 
 // --- Props ---
@@ -33,6 +33,22 @@ const emit = defineEmits([
 // --- State ---
 const searchTerm = ref('');
 const currentPage = ref(1); // Pagination state
+
+// --- Watch newlyCreatedId to auto-highlight and scroll to new participant ---
+watch(() => props.newlyCreatedId, async (newId) => {
+  if (newId) {
+    await nextTick();
+    // Try to scroll to the highlighted participant (mobile or desktop)
+    const el = document.querySelector(
+      `.highlight-new, .participant-id-mobile .display-6.fw-bold.text-primary`
+    );
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    // Optionally, reset highlight after a few seconds (if desired)
+    // setTimeout(() => emit('clear-newly-created-id'), 2500);
+  }
+});
 
 // --- Computed Properties ---
 const filteredParticipants = computed(() => {
@@ -292,17 +308,6 @@ const handleBaptismToggle = async (participant) => {
 </template>
 
 <style scoped>
-/* Ensure card takes full height if it's a flex item in parent */
-.card.d-flex.flex-column {
-    /* Height is managed by parent flex container */
-    
-}
-.card-body {
-    /* If the list inside is too long, this allows the body to scroll */
-}
-.table-responsive {
-    /* Max height can be set here if needed, or rely on card-body overflow */
-}
 .table thead th {
     vertical-align: middle;
     padding-top: 0.65rem;

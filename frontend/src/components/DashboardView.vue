@@ -57,17 +57,22 @@ const fetchStats = async (date = null) => {
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   } else {
-    console.warn(`DashboardView: No auth token found for API call to /dashboard/stats.`);
-    // error.value = "Authentication token not found. Please log in.";
-    // loading.value = false;
-    // return; // Optionally stop if token is absolutely required and not just for server check
+    // Immediate redirect to login if no token
+    localStorage.removeItem('authToken');
+    window.location.reload();
+    return;
   }
 
   try {
     const response = await fetch(`${API_BASE_URL}/dashboard/stats${queryParams}`, { headers });
+    if (response.status === 401) {
+      // Token invalid/expired: clear sensitive state and redirect to login immediately
+      localStorage.removeItem('authToken');
+      window.location.reload();
+      return;
+    }
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ message: 'Failed to fetch dashboard stats and could not parse error response.' }));
-      // Use the error message from the server if available
       throw new Error(errorData.error || errorData.message || `HTTP error ${response.status}`);
     }
     const fetchedStats = await response.json();
