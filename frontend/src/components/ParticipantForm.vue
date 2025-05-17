@@ -106,19 +106,19 @@ const availableReferrers = computed(() => {
 const submit = async () => {
   formError.value = '';
   if (!formData.name.trim()) {
-    formError.value = 'Participant name cannot be empty.';
+    formError.value = 'Le nom du participant est obligatoire.';
     return;
   }
-  if (formData.age && (isNaN(parseInt(formData.age)) || parseInt(formData.age) <= 0)) {
-    formError.value = 'Please enter a valid age.';
+  if (!formData.age || isNaN(parseInt(formData.age)) || parseInt(formData.age) <= 0) {
+    formError.value = 'L\'âge du participant est obligatoire et doit être un nombre valide.';
     return;
   }
-   if (formData.gender && !['M', 'F'].includes(formData.gender)) {
-    formError.value = 'Please select a valid gender.';
+  if (!formData.gender || !['M', 'F'].includes(formData.gender)) {
+    formError.value = 'Le genre du participant est obligatoire.';
     return;
   }
   if (!formData.date_joined) {
-      formError.value = 'Date joined cannot be empty.';
+      formError.value = 'Date d\'inscription obligatoire.';
       return;
   }
 

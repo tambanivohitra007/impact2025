@@ -315,7 +315,7 @@ const handleSaveParticipant = async (participantData) => {
             };
             newlyCreatedId.value = savedParticipant.id; // Highlight new participant
 
-            toast.success(`🎉 Participant "${savedParticipant.name}" added.\nID: ${savedParticipant.id}`);            
+            toast.success(`Participant "${savedParticipant.name}" added.\nID: ${savedParticipant.id}`);            
         }
         showParticipantModal.value = false;
         await fetchParticipants();
